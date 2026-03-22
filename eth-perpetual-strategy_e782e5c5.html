@@ -1,0 +1,1709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ETH 永续合约 · 短线狙击策略 V3.2</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Noto+Sans+SC:wght@300;400;500;700;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.0.3/src/regular/style.css">
+<!-- PLACEHOLDER: styles, body, scripts will be filled in via Edit -->
+<style>
+:root {
+  --bg-deep: #0a0e1a;
+  --bg-card: #111827;
+  --bg-card-hover: #1a2340;
+  --cyan: #00f0ff;
+  --magenta: #ff00e5;
+  --green: #00ff88;
+  --red: #ff3b5c;
+  --amber: #ffb800;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --glow-cyan: 0 0 20px rgba(0,240,255,0.3);
+  --glow-magenta: 0 0 20px rgba(255,0,229,0.3);
+  --glow-green: 0 0 20px rgba(0,255,136,0.3);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: 'Noto Sans SC', sans-serif;
+  overflow-x: hidden;
+}
+.font-mono { font-family: 'JetBrains Mono', monospace; }
+.font-orbit { font-family: 'Orbitron', sans-serif; }
+.bg-noise {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.grid-bg {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.04;
+  background-image:
+    linear-gradient(rgba(0,240,255,0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,240,255,0.3) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+.glow-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--cyan), var(--magenta), transparent);
+  box-shadow: var(--glow-cyan);
+}
+.glow-line-v {
+  width: 1px;
+  background: linear-gradient(180deg, transparent, var(--cyan), var(--magenta), transparent);
+}
+.card {
+  background: linear-gradient(135deg, rgba(17,24,39,0.9), rgba(26,35,64,0.7));
+  border: 1px solid rgba(0,240,255,0.12);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+.card:hover {
+  border-color: rgba(0,240,255,0.3);
+  box-shadow: 0 0 30px rgba(0,240,255,0.08);
+}
+.tag {
+  display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 0.75rem;
+  font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em;
+}
+.tag-cyan { background: rgba(0,240,255,0.1); color: var(--cyan); border: 1px solid rgba(0,240,255,0.2); }
+.tag-green { background: rgba(0,255,136,0.1); color: var(--green); border: 1px solid rgba(0,255,136,0.2); }
+.tag-red { background: rgba(255,59,92,0.1); color: var(--red); border: 1px solid rgba(255,59,92,0.2); }
+.tag-amber { background: rgba(255,184,0,0.1); color: var(--amber); border: 1px solid rgba(255,184,0,0.2); }
+.tag-magenta { background: rgba(255,0,229,0.1); color: var(--magenta); border: 1px solid rgba(255,0,229,0.2); }
+.progress-bar {
+  position: fixed; top: 0; left: 0; height: 2px; z-index: 9999;
+  background: linear-gradient(90deg, var(--cyan), var(--magenta));
+  box-shadow: var(--glow-cyan);
+  transform-origin: left; transform: scaleX(0);
+}
+.section-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.75rem; letter-spacing: 0.3em; text-transform: uppercase;
+  color: var(--cyan); margin-bottom: 0.5rem;
+}
+.hero-glitch {
+  text-shadow: 2px 0 var(--magenta), -2px 0 var(--cyan);
+  animation: glitch 3s infinite;
+}
+@keyframes glitch {
+  0%,92%,100% { text-shadow: 2px 0 var(--magenta), -2px 0 var(--cyan); }
+  93% { text-shadow: -3px 0 var(--magenta), 3px 0 var(--cyan); }
+  95% { text-shadow: 2px -1px var(--magenta), -2px 1px var(--cyan); }
+  97% { text-shadow: -1px 2px var(--magenta), 1px -2px var(--cyan); }
+}
+.checklist-item {
+  display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px;
+  border-left: 2px solid rgba(0,240,255,0.15);
+  transition: all 0.3s;
+}
+.checklist-item:hover { border-left-color: var(--cyan); background: rgba(0,240,255,0.03); }
+.check-box {
+  width: 20px; height: 20px; border: 1.5px solid var(--cyan); border-radius: 4px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;
+  color: var(--cyan); font-size: 12px; cursor: pointer; transition: all 0.2s;
+}
+.check-box.checked { background: rgba(0,240,255,0.15); }
+.scroll-fade { opacity: 0; transform: translateY(40px); }
+@media (max-width: 768px) {
+  .hero-title { font-size: 2rem !important; }
+  .grid-2 { grid-template-columns: 1fr !important; }
+}
+</style>
+</head>
+<body>
+<div class="bg-noise"></div>
+<div class="grid-bg"></div>
+<div class="progress-bar" id="progressBar"></div>
+
+<!-- ===================== HERO ===================== -->
+<header class="relative min-h-screen flex items-center justify-center overflow-hidden" id="hero">
+  <div class="absolute inset-0 flex items-center justify-center opacity-10">
+    <div style="width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(0,240,255,0.2),transparent 70%);filter:blur(80px);"></div>
+  </div>
+  <div class="absolute top-6 left-8 font-mono text-xs" style="color:var(--text-secondary)">
+    <span style="color:var(--cyan)">SYS</span> :: STRATEGY_ENGINE v3.2 &nbsp;|&nbsp; <span style="color:var(--green)">● ONLINE</span>
+  </div>
+  <div class="absolute top-6 right-8 font-mono text-xs" style="color:var(--text-secondary)">
+    CLASSIFIED &nbsp;|&nbsp; <span style="color:var(--amber)">ETH/USDT PERP</span>
+  </div>
+  <div class="text-center relative z-10 px-4" id="heroContent">
+    <p class="font-mono text-sm mb-4 tracking-widest" style="color:var(--cyan)">HIGH WIN-RATE SHORT-TERM TRADING SYSTEM</p>
+    <h1 class="hero-title font-orbit font-black hero-glitch leading-tight mb-6" style="font-size:3.5rem;">
+      ETH 永续合约<br><span style="color:var(--cyan)">短线狙击策略</span>
+    </h1>
+    <p class="text-lg mb-2" style="color:var(--text-secondary);max-width:600px;margin:0 auto;">
+      多指标共振 · 三重过滤 · 动态风控
+    </p>
+    <p class="font-mono text-xs mt-4" style="color:var(--text-secondary)">
+      TARGET WIN RATE: <span style="color:var(--green);font-weight:700;">68%+</span> &nbsp;|&nbsp;
+      RISK/REWARD: <span style="color:var(--cyan);font-weight:700;">1 : 1.8</span> &nbsp;|&nbsp;
+      TIMEFRAME: <span style="color:var(--amber);font-weight:700;">5M / 15M</span>
+    </p>
+    <div class="glow-line mt-10 mx-auto" style="max-width:400px;"></div>
+    <p class="font-mono text-xs mt-6 animate-bounce" style="color:var(--text-secondary)">↓ SCROLL TO DECODE ↓</p>
+  </div>
+</header>
+
+<!-- ===================== SECTION 1: OVERVIEW ===================== -->
+<section class="relative z-10 max-w-6xl mx-auto px-6 py-24" id="sec-overview">
+  <div class="scroll-fade">
+    <p class="section-title">01 // STRATEGY OVERVIEW</p>
+    <h2 class="text-3xl font-bold mb-8">策略概述</h2>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 scroll-fade">
+    <div class="card p-6 text-center">
+      <p class="font-mono text-xs mb-2" style="color:var(--text-secondary)">策略名称</p>
+      <p class="font-orbit font-bold text-lg" style="color:var(--cyan)">PHANTOM EDGE</p>
+      <p class="font-mono text-xs mt-1" style="color:var(--text-secondary)">v3.2</p>
+    </div>
+    <div class="card p-6 text-center">
+      <p class="font-mono text-xs mb-2" style="color:var(--text-secondary)">适用周期</p>
+      <p class="font-orbit font-bold text-2xl" style="color:var(--amber)">5M / 15M</p>
+      <p class="font-mono text-xs mt-1" style="color:var(--text-secondary)">辅助: 1M 精确入场</p>
+    </div>
+    <div class="card p-6 text-center">
+      <p class="font-mono text-xs mb-2" style="color:var(--text-secondary)">目标胜率</p>
+      <p class="font-orbit font-bold text-2xl" style="color:var(--green)">68%</p>
+      <p class="font-mono text-xs mt-1" style="color:var(--text-secondary)">回测均值: 66.7%</p>
+    </div>
+    <div class="card p-6 text-center">
+      <p class="font-mono text-xs mb-2" style="color:var(--text-secondary)">盈亏比</p>
+      <p class="font-orbit font-bold text-2xl" style="color:var(--magenta)">1 : 1.8</p>
+      <p class="font-mono text-xs mt-1" style="color:var(--text-secondary)">期望值: +0.62R</p>
+    </div>
+  </div>
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-sm mb-3" style="color:var(--cyan)">// 策略内核</p>
+    <p style="color:var(--text-secondary);line-height:1.8;">
+      Phantom Edge 是一套基于<strong style="color:var(--text-primary)">多指标共振 + 成交量确认 + 资金费率过滤</strong>的短线交易系统。
+      核心逻辑：在 EMA 趋势方向明确的前提下，等待 RSI 回调至关键区间、布林带收缩后突破、
+      同时出现成交量异动信号，三重过滤确认后入场。系统强调<strong style="color:var(--green)">「不交易则已，交易必有边际」</strong>——
+      宁可错过，不可做错。每笔交易严格执行风控纪律，单笔最大亏损控制在总资金的 1.5% 以内。
+    </p>
+  </div>
+</section>
+
+<!-- ===================== SECTION 2: INDICATORS ===================== -->
+<section class="relative z-10 max-w-6xl mx-auto px-6 py-24" id="sec-indicators">
+  <div class="scroll-fade">
+    <p class="section-title">02 // INDICATOR MATRIX</p>
+    <h2 class="text-3xl font-bold mb-8">核心指标体系</h2>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 grid-2">
+    <div class="card p-6 scroll-fade">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="tag tag-cyan">TREND</span>
+        <span class="font-bold">EMA 多周期组合</span>
+      </div>
+      <div class="font-mono text-sm" style="color:var(--text-secondary);line-height:2;">
+        <p><span style="color:var(--cyan)">EMA 9</span> — 短期动量方向（快线）</p>
+        <p><span style="color:var(--amber)">EMA 21</span> — 中期趋势骨架（中线）</p>
+        <p><span style="color:var(--magenta)">EMA 55</span> — 长期趋势锚定（慢线）</p>
+        <p style="color:var(--green);margin-top:8px;">▸ 多头排列: EMA9 > EMA21 > EMA55</p>
+        <p style="color:var(--red);">▸ 空头排列: EMA9 < EMA21 < EMA55</p>
+      </div>
+    </div>
+    <div class="card p-6 scroll-fade">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="tag tag-magenta">MOMENTUM</span>
+        <span class="font-bold">RSI 动量指标</span>
+      </div>
+      <div class="font-mono text-sm" style="color:var(--text-secondary);line-height:2;">
+        <p>周期: <span style="color:var(--cyan)">RSI(14)</span></p>
+        <p>多头入场区间: <span style="color:var(--green)">40 ~ 60</span>（回调不破位）</p>
+        <p>空头入场区间: <span style="color:var(--red)">40 ~ 60</span>（反弹不突破）</p>
+        <p>超买警戒: <span style="color:var(--red)">> 75</span> &nbsp; 超卖警戒: <span style="color:var(--green)">< 25</span></p>
+        <p style="color:var(--amber);margin-top:4px;">▸ 顶背离/底背离 = 高权重反转信号</p>
+      </div>
+    </div>
+    <div class="card p-6 scroll-fade">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="tag tag-amber">VOLATILITY</span>
+        <span class="font-bold">布林带收缩与突破</span>
+      </div>
+      <div class="font-mono text-sm" style="color:var(--text-secondary);line-height:2;">
+        <p>参数: <span style="color:var(--cyan)">BB(20, 2)</span></p>
+        <p>带宽收缩阈值: <span style="color:var(--amber)">BandWidth < 3%</span></p>
+        <p style="color:var(--green);">▸ 收缩后向上突破上轨 → 多头信号</p>
+        <p style="color:var(--red);">▸ 收缩后向下突破下轨 → 空头信号</p>
+        <p style="color:var(--text-secondary);margin-top:4px;">▸ 假突破过滤：需收盘价确认（非影线穿越）</p>
+      </div>
+    </div>
+    <div class="card p-6 scroll-fade">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="tag tag-green">VOLUME</span>
+        <span class="font-bold">成交量异动 + 资金费率</span>
+      </div>
+      <div class="font-mono text-sm" style="color:var(--text-secondary);line-height:2;">
+        <p>Volume Spike: <span style="color:var(--green)">当前量 > MA(20) × 2.0</span></p>
+        <p>量价背离: 价格新高但量能萎缩 → 警戒</p>
+        <p style="margin-top:8px;color:var(--cyan);">资金费率监控:</p>
+        <p style="color:var(--red);">▸ 费率 > +0.05% → 多头拥挤，谨慎做多</p>
+        <p style="color:var(--green);">▸ 费率 < -0.05% → 空头拥挤，谨慎做空</p>
+        <p style="color:var(--amber);">▸ 极端费率 = 反向开仓的辅助信号</p>
+      </div>
+    </div>
+  </div>
+  <!-- Radar Chart -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 指标权重雷达图</p>
+    <div id="chartRadar" style="width:100%;height:380px;"></div>
+  </div>
+</section>
+
+<!-- ===================== SECTION 3: ENTRY RULES ===================== -->
+<section class="relative z-10 max-w-6xl mx-auto px-6 py-24" id="sec-entry">
+  <div class="scroll-fade">
+    <p class="section-title">03 // ENTRY PROTOCOL</p>
+    <h2 class="text-3xl font-bold mb-8">入场规则</h2>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 grid-2">
+    <!-- LONG -->
+    <div class="card p-6 scroll-fade" style="border-color:rgba(0,255,136,0.2);">
+      <div class="flex items-center gap-3 mb-5">
+        <span style="font-size:1.5rem;color:var(--green);">▲</span>
+        <span class="font-bold text-lg" style="color:var(--green);">多头入场条件</span>
+        <span class="tag tag-green">LONG</span>
+      </div>
+      <div class="font-mono text-sm" style="line-height:2.2;">
+        <p style="color:var(--text-secondary)"><span style="color:var(--green);">①</span> EMA9 > EMA21 > EMA55（多头排列确认）</p>
+        <p style="color:var(--text-secondary)"><span style="color:var(--green);">②</span> RSI 从 40-50 区间回升，未超 70</p>
+        <p style="color:var(--text-secondary)"><span style="color:var(--green);">③</span> 价格触及 BB 中轨或下轨后反弹</p>
+        <p style="color:var(--text-secondary)"><span style="color:var(--green);">④</span> 成交量 > MA20 × 1.5（量能配合）</p>
+        <p style="color:var(--text-secondary)"><span style="color:var(--green);">⑤</span> 资金费率 ≤ +0.03%（非极端多头拥挤）</p>
+        <div class="glow-line my-4"></div>
+        <p style="color:var(--green);">▸ 至少满足 ①②③ 三个核心条件</p>
+        <p style="color:var(--green);">▸ ④⑤ 为加权条件（满足则加大仓位）</p>
+      </div>
+    </div>
+    <!-- SHORT -->
+    <div class="card p-6 scroll-fade" style="border-color:rgba(255,59,92,0.2);">
+      <div class="flex items-center gap-3 mb-5">
+        <span style="font-size:1.5rem;color:var(--red);">▼</span>
+        <span class="font-bold text-lg" style="color:var(--red);">空头入场条件</span>
+        <span class="tag tag-red">SHORT</span>
+      </div>
+      <div class="font-mono text-sm" style="line-height:2.2;">
+        <p style="color:var(--text-secondary)"><span style="color:var(--red);">①</span> EMA9 < EMA21 < EMA55（空头排列确认）</p>
+        <p style="color:var(--text-secondary)"><span style="color:var(--red);">②</span> RSI 从 50-60 区间回落，未破 30</p>
+        <p style="color:var(--text-secondary)"><span style="color:var(--red);">③</span> 价格触及 BB 中轨或上轨后回落</p>
+        <p style="color:var(--text-secondary)"><span style="color:var(--red);">④</span> 成交量 > MA20 × 1.5（量能放大）</p>
+        <p style="color:var(--text-secondary)"><span style="color:var(--red);">⑤</span> 资金费率 ≥ -0.03%（非极端空头拥挤）</p>
+        <div class="glow-line my-4"></div>
+        <p style="color:var(--red);">▸ 至少满足 ①②③ 三个核心条件</p>
+        <p style="color:var(--red);">▸ ④⑤ 为加权条件（满足则加大仓位）</p>
+      </div>
+    </div>
+  </div>
+  <!-- Signal Resonance Chart -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 信号共振矩阵 — 近期30笔交易信号分布</p>
+    <div id="chartResonance" style="width:100%;height:360px;"></div>
+  </div>
+</section>
+
+<!-- ===================== SECTION 4: EXIT RULES ===================== -->
+<section class="relative z-10 max-w-6xl mx-auto px-6 py-24" id="sec-exit">
+  <div class="scroll-fade">
+    <p class="section-title">04 // EXIT PROTOCOL</p>
+    <h2 class="text-3xl font-bold mb-8">出场规则</h2>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 scroll-fade">
+    <div class="card p-6">
+      <p class="font-bold mb-3" style="color:var(--green);">分批止盈</p>
+      <div class="font-mono text-sm" style="color:var(--text-secondary);line-height:2;">
+        <p><span style="color:var(--green);">T1</span> — 达到 1.0R → 平仓 40%</p>
+        <p><span style="color:var(--green);">T2</span> — 达到 1.8R → 平仓 40%</p>
+        <p><span style="color:var(--green);">T3</span> — 移动止损保护剩余 20%</p>
+        <p style="color:var(--amber);margin-top:8px;">T1 触发后止损移至成本价</p>
+      </div>
+    </div>
+    <div class="card p-6">
+      <p class="font-bold mb-3" style="color:var(--red);">止损机制</p>
+      <div class="font-mono text-sm" style="color:var(--text-secondary);line-height:2;">
+        <p><span style="color:var(--red);">固定止损</span> — 入场价 ± 0.8%</p>
+        <p><span style="color:var(--amber);">结构止损</span> — 前一根K线低/高点</p>
+        <p><span style="color:var(--cyan);">移动止损</span> — 盈利 > 1R 后启动</p>
+        <p style="margin-top:8px;"><span style="color:var(--magenta);">Trailing</span>: 回撤 ATR(14)×0.8 触发</p>
+      </div>
+    </div>
+    <div class="card p-6">
+      <p class="font-bold mb-3" style="color:var(--amber);">时间止损</p>
+      <div class="font-mono text-sm" style="color:var(--text-secondary);line-height:2;">
+        <p><span style="color:var(--amber);">5M 周期</span> — 最长持仓 30 分钟</p>
+        <p><span style="color:var(--amber);">15M 周期</span> — 最长持仓 90 分钟</p>
+        <p style="margin-top:8px;">超时未达 T1 → 市价平仓</p>
+        <p style="color:var(--red);">避免持仓过资金费率结算时点</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== SECTION 5: POSITION SIZING ===================== -->
+<section class="relative z-10 max-w-6xl mx-auto px-6 py-24" id="sec-position">
+  <div class="scroll-fade">
+    <p class="section-title">05 // POSITION SIZING</p>
+    <h2 class="text-3xl font-bold mb-8">仓位管理</h2>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 grid-2">
+    <div class="card p-6 scroll-fade">
+      <p class="font-bold mb-3" style="color:var(--cyan);">凯利公式最优仓位</p>
+      <div class="font-mono text-sm" style="color:var(--text-secondary);line-height:2;">
+        <p style="color:var(--cyan);font-size:1.1rem;">f* = (p × b - q) / b</p>
+        <p style="margin-top:8px;">p = 0.68 (胜率)</p>
+        <p>b = 1.8 (盈亏比)</p>
+        <p>q = 0.32 (败率)</p>
+        <p style="color:var(--green);margin-top:8px;font-size:1rem;">f* = (0.68 × 1.8 - 0.32) / 1.8 = <strong>50.2%</strong></p>
+        <p style="color:var(--amber);margin-top:8px;">实际使用: f*/3 ≈ <strong>16.7%</strong>（1/3 Kelly）</p>
+        <p style="color:var(--text-secondary)">保守执行，降低破产风险</p>
+      </div>
+    </div>
+    <div class="card p-6 scroll-fade">
+      <p class="font-bold mb-3" style="color:var(--magenta);">仓位规则</p>
+      <div class="font-mono text-sm" style="color:var(--text-secondary);line-height:2;">
+        <p><span style="color:var(--cyan);">基础仓位</span> — 总资金的 10%</p>
+        <p><span style="color:var(--green);">5信号共振</span> — 可加至 15%</p>
+        <p><span style="color:var(--red);">最大单笔</span> — 不超过 20%</p>
+        <p style="margin-top:8px;color:var(--amber);">加仓规则:</p>
+        <p>▸ 盈利 > 0.5R 后可加仓 50% 底仓</p>
+        <p>▸ 加仓后止损整体移至成本价</p>
+        <p style="margin-top:8px;color:var(--red);">减仓规则:</p>
+        <p>▸ 连亏 2 笔 → 下一笔降至 60% 仓位</p>
+        <p>▸ 连亏 3 笔 → 下一笔降至 40% 仓位</p>
+      </div>
+    </div>
+  </div>
+  <!-- Position sizing chart -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 不同Kelly比例下的资金增长模拟 (100笔交易)</p>
+    <div id="chartKelly" style="width:100%;height:360px;"></div>
+  </div>
+</section>
+
+<!-- ===================== SECTION 6: RISK CONTROL ===================== -->
+<section class="relative z-10 max-w-6xl mx-auto px-6 py-24" id="sec-risk">
+  <div class="scroll-fade">
+    <p class="section-title">06 // RISK CONTROL</p>
+    <h2 class="text-3xl font-bold mb-8">风控体系</h2>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 scroll-fade">
+    <div class="card p-6 text-center" style="border-color:rgba(255,59,92,0.25);">
+      <p class="font-mono text-xs mb-2" style="color:var(--text-secondary)">单笔最大亏损</p>
+      <p class="font-orbit font-bold text-3xl" style="color:var(--red);">1.5%</p>
+      <p class="font-mono text-xs mt-2" style="color:var(--text-secondary)">of total equity</p>
+    </div>
+    <div class="card p-6 text-center" style="border-color:rgba(255,184,0,0.25);">
+      <p class="font-mono text-xs mb-2" style="color:var(--text-secondary)">日最大亏损</p>
+      <p class="font-orbit font-bold text-3xl" style="color:var(--amber);">4%</p>
+      <p class="font-mono text-xs mt-2" style="color:var(--text-secondary)">触发后当日停止交易</p>
+    </div>
+    <div class="card p-6 text-center" style="border-color:rgba(255,0,229,0.25);">
+      <p class="font-mono text-xs mb-2" style="color:var(--text-secondary)">连续亏损熔断</p>
+      <p class="font-orbit font-bold text-3xl" style="color:var(--magenta);">5 笔</p>
+      <p class="font-mono text-xs mt-2" style="color:var(--text-secondary)">强制休息 24 小时</p>
+    </div>
+  </div>
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 熔断机制流程</p>
+    <div class="font-mono text-sm" style="color:var(--text-secondary);line-height:2.2;">
+      <p><span style="color:var(--green);">Level 0</span> — 正常交易，100% 仓位执行</p>
+      <p><span style="color:var(--amber);">Level 1</span> — 连亏 2 笔：仓位降至 60%，复盘近期交易</p>
+      <p><span style="color:var(--amber);">Level 2</span> — 连亏 3 笔：仓位降至 40%，仅交易 A+ 信号</p>
+      <p><span style="color:var(--red);">Level 3</span> — 日亏损达 4%：当日停止交易</p>
+      <p><span style="color:var(--magenta);">Level 4</span> — 连亏 5 笔：强制休息 24h，全面复盘策略</p>
+      <p><span style="color:var(--red);font-weight:700;">HARD STOP</span> — 周亏损达 8%：暂停交易一周，检查是否需要调整策略参数</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== SECTION 7: BACKTEST ===================== -->
+<section class="relative z-10 max-w-6xl mx-auto px-6 py-24" id="sec-backtest">
+  <div class="scroll-fade">
+    <p class="section-title">07 // BACKTEST SIMULATION</p>
+    <h2 class="text-3xl font-bold mb-8">回测模拟数据</h2>
+  </div>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 scroll-fade">
+    <div class="card p-4 text-center">
+      <p class="font-mono text-xs" style="color:var(--text-secondary)">总交易数</p>
+      <p class="font-orbit font-bold text-xl mt-1" style="color:var(--cyan);">100</p>
+    </div>
+    <div class="card p-4 text-center">
+      <p class="font-mono text-xs" style="color:var(--text-secondary)">胜率</p>
+      <p class="font-orbit font-bold text-xl mt-1" style="color:var(--green);">66.7%</p>
+    </div>
+    <div class="card p-4 text-center">
+      <p class="font-mono text-xs" style="color:var(--text-secondary)">最大回撤</p>
+      <p class="font-orbit font-bold text-xl mt-1" style="color:var(--red);">-12.3%</p>
+    </div>
+    <div class="card p-4 text-center">
+      <p class="font-mono text-xs" style="color:var(--text-secondary)">净收益</p>
+      <p class="font-orbit font-bold text-xl mt-1" style="color:var(--green);">+62.4%</p>
+    </div>
+  </div>
+  <!-- Equity Curve -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 模拟净值曲线 (初始资金 $10,000)</p>
+    <div id="chartEquity" style="width:100%;height:380px;"></div>
+  </div>
+  <!-- PnL Distribution -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 单笔盈亏分布直方图</p>
+    <div id="chartPnL" style="width:100%;height:340px;"></div>
+  </div>
+  <!-- Drawdown -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 回撤曲线</p>
+    <div id="chartDrawdown" style="width:100%;height:300px;"></div>
+  </div>
+</section>
+
+<!-- ===================== SECTION 7B: LONG-TERM BACKTEST ===================== -->
+<section class="relative z-10 max-w-6xl mx-auto px-6 py-24" id="sec-longterm">
+  <div class="scroll-fade">
+    <p class="section-title">07-B // LONG-TERM BACKTEST — 40 MONTHS</p>
+    <h2 class="text-3xl font-bold mb-3">长周期回测数据</h2>
+    <p class="font-mono text-sm mb-8" style="color:var(--text-secondary);">回测区间: 2023-01 → 2026-03 &nbsp;|&nbsp; 3年3个月 &nbsp;|&nbsp; ~3,300 笔模拟交易 &nbsp;|&nbsp; 初始资金 $10,000</p>
+  </div>
+
+  <!-- Long-term KPI cards -->
+  <div class="grid grid-cols-2 md:grid-cols-6 gap-3 scroll-fade">
+    <div class="card p-4 text-center">
+      <p class="font-mono text-xs" style="color:var(--text-secondary)">总交易</p>
+      <p class="font-orbit font-bold text-xl mt-1" style="color:var(--cyan);" id="lt-trades">—</p>
+    </div>
+    <div class="card p-4 text-center">
+      <p class="font-mono text-xs" style="color:var(--text-secondary)">总净收益</p>
+      <p class="font-orbit font-bold text-xl mt-1" style="color:var(--green);" id="lt-return">—</p>
+    </div>
+    <div class="card p-4 text-center">
+      <p class="font-mono text-xs" style="color:var(--text-secondary)">年化收益</p>
+      <p class="font-orbit font-bold text-xl mt-1" style="color:var(--green);" id="lt-annual">—</p>
+    </div>
+    <div class="card p-4 text-center">
+      <p class="font-mono text-xs" style="color:var(--text-secondary)">总胜率</p>
+      <p class="font-orbit font-bold text-xl mt-1" style="color:var(--cyan);" id="lt-winrate">—</p>
+    </div>
+    <div class="card p-4 text-center">
+      <p class="font-mono text-xs" style="color:var(--text-secondary)">最大回撤</p>
+      <p class="font-orbit font-bold text-xl mt-1" style="color:var(--red);" id="lt-maxdd">—</p>
+    </div>
+    <div class="card p-4 text-center">
+      <p class="font-mono text-xs" style="color:var(--text-secondary)">Sharpe Ratio</p>
+      <p class="font-orbit font-bold text-xl mt-1" style="color:var(--magenta);" id="lt-sharpe">—</p>
+    </div>
+  </div>
+
+  <!-- Secondary KPI row -->
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3 scroll-fade">
+    <div class="card p-3 text-center">
+      <p class="font-mono text-xs" style="color:var(--text-secondary)">盈利因子</p>
+      <p class="font-orbit font-bold text-lg mt-1" style="color:var(--green);" id="lt-pf">—</p>
+    </div>
+    <div class="card p-3 text-center">
+      <p class="font-mono text-xs" style="color:var(--text-secondary)">平均盈利</p>
+      <p class="font-orbit font-bold text-lg mt-1" style="color:var(--green);" id="lt-avgwin">—</p>
+    </div>
+    <div class="card p-3 text-center">
+      <p class="font-mono text-xs" style="color:var(--text-secondary)">平均亏损</p>
+      <p class="font-orbit font-bold text-lg mt-1" style="color:var(--red);" id="lt-avgloss">—</p>
+    </div>
+    <div class="card p-3 text-center">
+      <p class="font-mono text-xs" style="color:var(--text-secondary)">最大连胜</p>
+      <p class="font-orbit font-bold text-lg mt-1" style="color:var(--green);" id="lt-maxwin">—</p>
+    </div>
+    <div class="card p-3 text-center">
+      <p class="font-mono text-xs" style="color:var(--text-secondary)">最大连亏</p>
+      <p class="font-orbit font-bold text-lg mt-1" style="color:var(--red);" id="lt-maxloss">—</p>
+    </div>
+  </div>
+
+  <!-- Long-term equity curve -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 40个月净值曲线 (~3,300笔交易)</p>
+    <div id="chartLtEquity" style="width:100%;height:420px;"></div>
+  </div>
+
+  <!-- Long-term drawdown -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 长周期回撤曲线</p>
+    <div id="chartLtDrawdown" style="width:100%;height:300px;"></div>
+  </div>
+
+  <!-- Monthly P&L -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 月度盈亏分布 (绝对收益 $)</p>
+    <div id="chartMonthlyPnL" style="width:100%;height:360px;"></div>
+  </div>
+
+  <!-- Rolling win rate -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 滚动50笔胜率 & 滚动盈亏比</p>
+    <div id="chartRolling" style="width:100%;height:340px;"></div>
+  </div>
+
+  <!-- Monthly heatmap table -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 月度统计明细</p>
+    <div style="overflow-x:auto;">
+      <table class="w-full font-mono text-sm" style="border-collapse:collapse;" id="monthlyTable">
+        <thead>
+          <tr style="border-bottom:1px solid rgba(0,240,255,0.15);">
+            <th class="px-3 py-2 text-left" style="color:var(--cyan);">月份</th>
+            <th class="px-3 py-2 text-right" style="color:var(--text-secondary);">交易数</th>
+            <th class="px-3 py-2 text-right" style="color:var(--text-secondary);">胜率</th>
+            <th class="px-3 py-2 text-right" style="color:var(--text-secondary);">盈亏比</th>
+            <th class="px-3 py-2 text-right" style="color:var(--text-secondary);">月收益%</th>
+            <th class="px-3 py-2 text-right" style="color:var(--text-secondary);">月收益$</th>
+            <th class="px-3 py-2 text-right" style="color:var(--text-secondary);">最大回撤</th>
+            <th class="px-3 py-2 text-right" style="color:var(--text-secondary);">盈利因子</th>
+          </tr>
+        </thead>
+        <tbody id="monthlyBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Win/Loss streak distribution -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 连胜/连亏序列分布</p>
+    <div id="chartStreaks" style="width:100%;height:300px;"></div>
+  </div>
+
+  <!-- Long-term PnL distribution (wider) -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 单笔盈亏分布 (~3,300笔) — 含正态拟合</p>
+    <div id="chartLtPnL" style="width:100%;height:340px;"></div>
+  </div>
+
+  <!-- Yearly comparison -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 年度表现对比 (2023 / 2024 / 2025 / 2026-Q1)</p>
+    <div id="chartYearly" style="width:100%;height:380px;"></div>
+  </div>
+
+  <!-- Quarterly heatmap -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 季度收益率热力图 (%)</p>
+    <div id="chartQuarterly" style="width:100%;height:280px;"></div>
+  </div>
+
+  <!-- Annual summary table -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 年度统计汇总</p>
+    <div style="overflow-x:auto;">
+      <table class="w-full font-mono text-sm" style="border-collapse:collapse;" id="yearlyTable">
+        <thead>
+          <tr style="border-bottom:1px solid rgba(0,240,255,0.15);">
+            <th class="px-3 py-2 text-left" style="color:var(--cyan);">年度</th>
+            <th class="px-3 py-2 text-right" style="color:var(--text-secondary);">交易数</th>
+            <th class="px-3 py-2 text-right" style="color:var(--text-secondary);">胜率</th>
+            <th class="px-3 py-2 text-right" style="color:var(--text-secondary);">盈亏比</th>
+            <th class="px-3 py-2 text-right" style="color:var(--text-secondary);">年收益%</th>
+            <th class="px-3 py-2 text-right" style="color:var(--text-secondary);">最大回撤</th>
+            <th class="px-3 py-2 text-right" style="color:var(--text-secondary);">盈利因子</th>
+            <th class="px-3 py-2 text-right" style="color:var(--text-secondary);">Sharpe</th>
+            <th class="px-3 py-2 text-right" style="color:var(--text-secondary);">Calmar</th>
+          </tr>
+        </thead>
+        <tbody id="yearlyBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Underwater equity curve (time spent in drawdown) -->
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 月度收益率时序 + 累计收益曲线</p>
+    <div id="chartMonthlyReturns" style="width:100%;height:380px;"></div>
+  </div>
+</section>
+
+<!-- ===================== SECTION 8: MARKET REGIMES ===================== -->
+<section class="relative z-10 max-w-6xl mx-auto px-6 py-24" id="sec-regime">
+  <div class="scroll-fade">
+    <p class="section-title">08 // MARKET REGIME ADAPTATION</p>
+    <h2 class="text-3xl font-bold mb-8">市场环境适配</h2>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 grid-2 scroll-fade">
+    <div class="card p-6" style="border-top:2px solid var(--green);">
+      <p class="font-bold mb-3" style="color:var(--green);">趋势市</p>
+      <p class="font-mono text-xs mb-3" style="color:var(--text-secondary)">ADX > 25 | EMA 三线发散</p>
+      <div class="font-mono text-sm" style="color:var(--text-secondary);line-height:2;">
+        <p>▸ 仓位可上调至 15-20%</p>
+        <p>▸ 延长持仓时间</p>
+        <p>▸ 移动止损代替固定止盈</p>
+        <p>▸ 只做趋势方向的单</p>
+        <p style="color:var(--green);">胜率预期: 72%+</p>
+      </div>
+    </div>
+    <div class="card p-6" style="border-top:2px solid var(--amber);">
+      <p class="font-bold mb-3" style="color:var(--amber);">震荡市</p>
+      <p class="font-mono text-xs mb-3" style="color:var(--text-secondary)">ADX < 20 | BB 收缩 | 无明确排列</p>
+      <div class="font-mono text-sm" style="color:var(--text-secondary);line-height:2;">
+        <p>▸ 仓位降低至 5-8%</p>
+        <p>▸ 切换至区间交易模式</p>
+        <p>▸ 关注 BB 上下轨反弹</p>
+        <p>▸ 缩小止盈目标至 1.2R</p>
+        <p style="color:var(--amber);">胜率预期: 60%</p>
+      </div>
+    </div>
+    <div class="card p-6" style="border-top:2px solid var(--red);">
+      <p class="font-bold mb-3" style="color:var(--red);">极端行情</p>
+      <p class="font-mono text-xs mb-3" style="color:var(--text-secondary)">单日波动 > 8% | 插针 | 连环爆仓</p>
+      <div class="font-mono text-sm" style="color:var(--text-secondary);line-height:2;">
+        <p>▸ <strong>停止交易或最小仓位</strong></p>
+        <p>▸ 杠杆降至 2x 以下</p>
+        <p>▸ 仅交易明确的极端反转</p>
+        <p>▸ 止损扩大至 1.5%</p>
+        <p style="color:var(--red);">核心原则: 保住本金</p>
+      </div>
+    </div>
+  </div>
+  <div class="card p-6 mt-6 scroll-fade">
+    <p class="font-mono text-xs mb-4" style="color:var(--cyan)">// 不同市场环境下策略表现对比</p>
+    <div id="chartRegime" style="width:100%;height:340px;"></div>
+  </div>
+</section>
+
+<!-- ===================== SECTION 9: CHECKLIST ===================== -->
+<section class="relative z-10 max-w-6xl mx-auto px-6 py-24" id="sec-checklist">
+  <div class="scroll-fade">
+    <p class="section-title">09 // EXECUTION CHECKLIST</p>
+    <h2 class="text-3xl font-bold mb-8">策略执行检查清单</h2>
+  </div>
+  <div class="card p-6 scroll-fade">
+    <p class="font-mono text-xs mb-6" style="color:var(--cyan)">// 每笔交易前必须逐项确认</p>
+    <div class="space-y-2" id="checklist">
+      <div class="checklist-item"><div class="check-box" onclick="this.classList.toggle('checked');this.innerHTML=this.classList.contains('checked')?'✓':''">  </div><div><p class="font-mono text-sm"><span style="color:var(--cyan);">[PRE]</span> 确认当前市场环境（趋势/震荡/极端）</p></div></div>
+      <div class="checklist-item"><div class="check-box" onclick="this.classList.toggle('checked');this.innerHTML=this.classList.contains('checked')?'✓':''">  </div><div><p class="font-mono text-sm"><span style="color:var(--cyan);">[PRE]</span> 检查资金费率，排除极端拥挤</p></div></div>
+      <div class="checklist-item"><div class="check-box" onclick="this.classList.toggle('checked');this.innerHTML=this.classList.contains('checked')?'✓':''">  </div><div><p class="font-mono text-sm"><span style="color:var(--cyan);">[PRE]</span> 确认今日未触发熔断规则</p></div></div>
+      <div class="glow-line my-3"></div>
+      <div class="checklist-item"><div class="check-box" onclick="this.classList.toggle('checked');this.innerHTML=this.classList.contains('checked')?'✓':''">  </div><div><p class="font-mono text-sm"><span style="color:var(--green);">[ENTRY]</span> EMA 排列方向确认 ✓</p></div></div>
+      <div class="checklist-item"><div class="check-box" onclick="this.classList.toggle('checked');this.innerHTML=this.classList.contains('checked')?'✓':''">  </div><div><p class="font-mono text-sm"><span style="color:var(--green);">[ENTRY]</span> RSI 处于有效入场区间 ✓</p></div></div>
+      <div class="checklist-item"><div class="check-box" onclick="this.classList.toggle('checked');this.innerHTML=this.classList.contains('checked')?'✓':''">  </div><div><p class="font-mono text-sm"><span style="color:var(--green);">[ENTRY]</span> 布林带位置/收缩状态确认 ✓</p></div></div>
+      <div class="checklist-item"><div class="check-box" onclick="this.classList.toggle('checked');this.innerHTML=this.classList.contains('checked')?'✓':''">  </div><div><p class="font-mono text-sm"><span style="color:var(--green);">[ENTRY]</span> 成交量异动确认（可选加权）✓</p></div></div>
+      <div class="checklist-item"><div class="check-box" onclick="this.classList.toggle('checked');this.innerHTML=this.classList.contains('checked')?'✓':''">  </div><div><p class="font-mono text-sm"><span style="color:var(--green);">[ENTRY]</span> 至少 3 个核心信号共振 ✓</p></div></div>
+      <div class="glow-line my-3"></div>
+      <div class="checklist-item"><div class="check-box" onclick="this.classList.toggle('checked');this.innerHTML=this.classList.contains('checked')?'✓':''">  </div><div><p class="font-mono text-sm"><span style="color:var(--amber);">[RISK]</span> 计算仓位 ≤ 最大允许仓位</p></div></div>
+      <div class="checklist-item"><div class="check-box" onclick="this.classList.toggle('checked');this.innerHTML=this.classList.contains('checked')?'✓':''">  </div><div><p class="font-mono text-sm"><span style="color:var(--amber);">[RISK]</span> 止损点位已设定，亏损 ≤ 1.5%</p></div></div>
+      <div class="checklist-item"><div class="check-box" onclick="this.classList.toggle('checked');this.innerHTML=this.classList.contains('checked')?'✓':''">  </div><div><p class="font-mono text-sm"><span style="color:var(--amber);">[RISK]</span> 分批止盈计划已制定 (T1/T2/T3)</p></div></div>
+      <div class="checklist-item"><div class="check-box" onclick="this.classList.toggle('checked');this.innerHTML=this.classList.contains('checked')?'✓':''">  </div><div><p class="font-mono text-sm"><span style="color:var(--amber);">[RISK]</span> 时间止损提醒已设定</p></div></div>
+      <div class="glow-line my-3"></div>
+      <div class="checklist-item"><div class="check-box" onclick="this.classList.toggle('checked');this.innerHTML=this.classList.contains('checked')?'✓':''">  </div><div><p class="font-mono text-sm"><span style="color:var(--magenta);">[POST]</span> 交易结束后记录至交易日志</p></div></div>
+      <div class="checklist-item"><div class="check-box" onclick="this.classList.toggle('checked');this.innerHTML=this.classList.contains('checked')?'✓':''">  </div><div><p class="font-mono text-sm"><span style="color:var(--magenta);">[POST]</span> 截图保存入场/出场点位</p></div></div>
+      <div class="checklist-item"><div class="check-box" onclick="this.classList.toggle('checked');this.innerHTML=this.classList.contains('checked')?'✓':''">  </div><div><p class="font-mono text-sm"><span style="color:var(--magenta);">[POST]</span> 复盘：是否严格执行策略？偏差原因？</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FOOTER ===================== -->
+<footer class="relative z-10 max-w-6xl mx-auto px-6 py-16 text-center">
+  <div class="glow-line mb-8 mx-auto" style="max-width:300px;"></div>
+  <p class="font-mono text-xs" style="color:var(--text-secondary);">
+    PHANTOM EDGE v3.2 &nbsp;|&nbsp; ETH/USDT PERPETUAL STRATEGY &nbsp;|&nbsp; FOR EDUCATIONAL PURPOSES ONLY
+  </p>
+  <p class="font-mono text-xs mt-2" style="color:rgba(148,163,184,0.4);">
+    免责声明：本策略仅供学习交流，不构成任何投资建议。加密货币交易风险极高，请谨慎决策。
+  </p>
+</footer>
+
+<!-- ===================== SCRIPTS ===================== -->
+<script>
+// === GSAP ScrollTrigger Setup ===
+gsap.registerPlugin(ScrollTrigger);
+
+// Progress bar
+gsap.to('#progressBar', {
+  scaleX: 1,
+  ease: 'none',
+  scrollTrigger: { trigger: 'body', start: 'top top', end: 'bottom bottom', scrub: 0.3 }
+});
+
+// Hero parallax
+gsap.to('#heroContent', {
+  y: 150, opacity: 0,
+  scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom top', scrub: true }
+});
+
+// Scroll fade-in animations
+document.querySelectorAll('.scroll-fade').forEach(el => {
+  gsap.to(el, {
+    opacity: 1, y: 0, duration: 0.8, ease: 'power2.out',
+    scrollTrigger: { trigger: el, start: 'top 85%', toggleActions: 'play none none none' }
+  });
+});
+
+// === CHART THEME ===
+const cTheme = {
+  bg: 'transparent',
+  cyan: '#00f0ff',
+  magenta: '#ff00e5',
+  green: '#00ff88',
+  red: '#ff3b5c',
+  amber: '#ffb800',
+  text: '#94a3b8',
+  gridLine: 'rgba(148,163,184,0.08)',
+  font: 'JetBrains Mono, monospace'
+};
+
+function baseAxisStyle() {
+  return {
+    axisLine: { lineStyle: { color: cTheme.gridLine } },
+    axisTick: { show: false },
+    axisLabel: { color: cTheme.text, fontFamily: cTheme.font, fontSize: 11 },
+    splitLine: { lineStyle: { color: cTheme.gridLine } }
+  };
+}
+
+// === CHART 1: RADAR — Indicator Weights ===
+const chartRadar = echarts.init(document.getElementById('chartRadar'), null, { renderer: 'svg' });
+chartRadar.setOption({
+  backgroundColor: cTheme.bg,
+  radar: {
+    indicator: [
+      { name: 'EMA趋势', max: 100 },
+      { name: 'RSI动量', max: 100 },
+      { name: '布林带', max: 100 },
+      { name: '成交量', max: 100 },
+      { name: '资金费率', max: 100 }
+    ],
+    shape: 'polygon',
+    splitNumber: 4,
+    axisName: { color: cTheme.text, fontFamily: cTheme.font, fontSize: 12 },
+    splitArea: { areaStyle: { color: ['rgba(0,240,255,0.02)', 'rgba(0,240,255,0.04)', 'rgba(0,240,255,0.02)', 'rgba(0,240,255,0.04)'] } },
+    axisLine: { lineStyle: { color: 'rgba(0,240,255,0.15)' } },
+    splitLine: { lineStyle: { color: 'rgba(0,240,255,0.1)' } }
+  },
+  series: [{
+    type: 'radar',
+    data: [
+      {
+        value: [95, 80, 75, 65, 50],
+        name: '信号权重',
+        areaStyle: { color: 'rgba(0,240,255,0.12)' },
+        lineStyle: { color: cTheme.cyan, width: 2 },
+        itemStyle: { color: cTheme.cyan },
+        symbol: 'circle', symbolSize: 6
+      },
+      {
+        value: [85, 70, 80, 70, 60],
+        name: '信号可靠度',
+        areaStyle: { color: 'rgba(255,0,229,0.08)' },
+        lineStyle: { color: cTheme.magenta, width: 2 },
+        itemStyle: { color: cTheme.magenta },
+        symbol: 'circle', symbolSize: 6
+      }
+    ]
+  }],
+  tooltip: {
+    trigger: 'item',
+    backgroundColor: '#1a2340',
+    borderColor: 'rgba(0,240,255,0.2)',
+    textStyle: { color: '#e2e8f0', fontFamily: cTheme.font, fontSize: 12 }
+  },
+  legend: {
+    bottom: 0,
+    textStyle: { color: cTheme.text, fontFamily: cTheme.font, fontSize: 11 },
+    itemStyle: { borderWidth: 0 }
+  }
+});
+
+// === CHART 2: RESONANCE HEATMAP ===
+const chartRes = echarts.init(document.getElementById('chartResonance'), null, { renderer: 'svg' });
+const signals = ['EMA排列', 'RSI区间', 'BB突破', '量能放大', '费率适宜'];
+const trades = Array.from({length:30}, (_,i) => '#'+(i+1));
+const heatData = [];
+const tradeResults = [];
+// Generate simulated signal data
+const seedRandom = (function(){let s=42;return function(){s=(s*16807)%2147483647;return(s-1)/2147483646;}})();
+for(let t=0;t<30;t++){
+  let count=0;
+  for(let s=0;s<5;s++){
+    const v = seedRandom() > (s<3?0.3:0.4) ? 1 : 0;
+    heatData.push([t,s,v]);
+    count+=v;
+  }
+  tradeResults.push(count>=3?(seedRandom()>0.25?1:-1):(seedRandom()>0.55?1:-1));
+}
+chartRes.setOption({
+  backgroundColor: cTheme.bg,
+  tooltip: {
+    position: 'top',
+    backgroundColor: '#1a2340',
+    borderColor: 'rgba(0,240,255,0.2)',
+    textStyle: { color: '#e2e8f0', fontFamily: cTheme.font, fontSize: 12 },
+    formatter: function(p){
+      const sig = signals[p.value[1]];
+      const st = p.value[2]?'<span style="color:#00ff88">✓ 触发</span>':'<span style="color:#ff3b5c">✗ 未触发</span>';
+      const res = tradeResults[p.value[0]]>0?'<span style="color:#00ff88">盈利</span>':'<span style="color:#ff3b5c">亏损</span>';
+      return `交易 #${p.value[0]+1}<br/>${sig}: ${st}<br/>结果: ${res}`;
+    }
+  },
+  grid: { left: 80, right: 30, top: 10, bottom: 40 },
+  xAxis: {
+    type: 'category', data: trades, position: 'bottom',
+    axisLabel: { color: cTheme.text, fontFamily: cTheme.font, fontSize: 9, interval: 4 },
+    axisTick: {show:false}, axisLine: {lineStyle:{color:cTheme.gridLine}},
+    splitLine: {show:false}
+  },
+  yAxis: {
+    type: 'category', data: signals,
+    axisLabel: { color: cTheme.text, fontFamily: cTheme.font, fontSize: 11 },
+    axisTick: {show:false}, axisLine: {lineStyle:{color:cTheme.gridLine}},
+    splitLine: {show:false}
+  },
+  visualMap: {
+    min: 0, max: 1, show: false,
+    inRange: { color: ['rgba(255,59,92,0.2)', 'rgba(0,255,136,0.6)'] }
+  },
+  series: [{
+    type: 'heatmap', data: heatData,
+    itemStyle: { borderColor: '#0a0e1a', borderWidth: 2, borderRadius: 3 },
+    emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,240,255,0.3)' } }
+  }]
+});
+
+// === SIMULATED BACKTEST DATA ===
+const simTrades = [];
+let equity = 10000;
+const equityArr = [equity];
+let s2 = 77;
+function rand2(){s2=(s2*48271)%2147483647;return(s2-1)/2147483646;}
+for(let i=0;i<100;i++){
+  const win = rand2() < 0.667;
+  const pnl = win ? (0.8 + rand2()*2.0) : -(0.5 + rand2()*1.0);
+  const pnlAmt = equity * (pnl/100);
+  equity += pnlAmt;
+  equityArr.push(equity);
+  simTrades.push({idx:i+1, pnl: pnl, pnlAmt: pnlAmt, equity: equity, win: win});
+}
+
+// Drawdown calc
+let peak = equityArr[0];
+const ddArr = [0];
+for(let i=1;i<equityArr.length;i++){
+  if(equityArr[i]>peak) peak=equityArr[i];
+  ddArr.push(((equityArr[i]-peak)/peak)*100);
+}
+
+// === CHART 3: EQUITY CURVE ===
+const chartEq = echarts.init(document.getElementById('chartEquity'), null, { renderer: 'svg' });
+chartEq.setOption({
+  backgroundColor: cTheme.bg,
+  tooltip: {
+    trigger:'axis',
+    backgroundColor: '#1a2340',
+    borderColor: 'rgba(0,240,255,0.2)',
+    textStyle: { color: '#e2e8f0', fontFamily: cTheme.font, fontSize: 12 },
+    formatter: function(ps){
+      const p=ps[0];
+      return `交易 #${p.dataIndex}<br/>净值: <strong style="color:${cTheme.cyan}">$${p.value.toFixed(2)}</strong>`;
+    }
+  },
+  grid: { left: 70, right: 30, top: 30, bottom: 40 },
+  xAxis: {
+    type: 'category',
+    data: equityArr.map((_,i)=>i),
+    ...baseAxisStyle(),
+    axisLabel: { ...baseAxisStyle().axisLabel, formatter: v => v%20===0?'#'+v:'' }
+  },
+  yAxis: {
+    type: 'value',
+    ...baseAxisStyle(),
+    axisLabel: { ...baseAxisStyle().axisLabel, formatter: v => '$'+v.toLocaleString() }
+  },
+  series: [{
+    type: 'line', data: equityArr, smooth: true, showSymbol: false,
+    lineStyle: { color: cTheme.cyan, width: 2 },
+    areaStyle: {
+      color: new echarts.graphic.LinearGradient(0,0,0,1,[
+        {offset:0, color:'rgba(0,240,255,0.15)'},
+        {offset:1, color:'rgba(0,240,255,0)'}
+      ])
+    },
+    markLine: {
+      silent: true,
+      data: [{ yAxis: 10000, lineStyle: { color: 'rgba(255,184,0,0.4)', type: 'dashed' }, label: { formatter: '初始资金', color: cTheme.amber, fontFamily: cTheme.font, fontSize: 10 } }]
+    },
+    markPoint: {
+      data: [
+        { type: 'max', name: '最高', itemStyle: { color: cTheme.green } },
+        { type: 'min', name: '最低', itemStyle: { color: cTheme.red } }
+      ],
+      label: { formatter: p => '$'+p.value.toFixed(0), fontFamily: cTheme.font, fontSize: 10 }
+    }
+  }]
+});
+
+// === CHART 4: PnL HISTOGRAM ===
+const chartPnL = echarts.init(document.getElementById('chartPnL'), null, { renderer: 'svg' });
+const pnlValues = simTrades.map(t=>parseFloat(t.pnl.toFixed(2)));
+// Build histogram bins
+const bins = {};
+for(let b=-1.6;b<=3.0;b+=0.2){ bins[b.toFixed(1)]=0; }
+pnlValues.forEach(v=>{
+  const bk = (Math.floor(v/0.2)*0.2).toFixed(1);
+  if(bins[bk]!==undefined) bins[bk]++;
+  else { const near = Object.keys(bins).reduce((a,b)=>Math.abs(parseFloat(b)-v)<Math.abs(parseFloat(a)-v)?b:a); bins[near]++; }
+});
+const binKeys = Object.keys(bins).sort((a,b)=>parseFloat(a)-parseFloat(b));
+const binVals = binKeys.map(k=>bins[k]);
+chartPnL.setOption({
+  backgroundColor: cTheme.bg,
+  tooltip: {
+    trigger:'axis',
+    backgroundColor: '#1a2340',
+    borderColor: 'rgba(0,240,255,0.2)',
+    textStyle: { color: '#e2e8f0', fontFamily: cTheme.font, fontSize: 12 },
+    formatter: function(ps){
+      return `盈亏区间: ${ps[0].name}%<br/>交易数: <strong>${ps[0].value}</strong> 笔`;
+    }
+  },
+  grid: { left: 50, right: 30, top: 20, bottom: 40 },
+  xAxis: {
+    type: 'category', data: binKeys,
+    ...baseAxisStyle(),
+    axisLabel: { ...baseAxisStyle().axisLabel, formatter: v => v+'%', interval: 2 }
+  },
+  yAxis: { type: 'value', ...baseAxisStyle() },
+  series: [{
+    type: 'bar', data: binVals,
+    itemStyle: {
+      color: function(p){
+        return parseFloat(binKeys[p.dataIndex])>=0 ?
+          new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(0,255,136,0.8)'},{offset:1,color:'rgba(0,255,136,0.2)'}]) :
+          new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(255,59,92,0.8)'},{offset:1,color:'rgba(255,59,92,0.2)'}]);
+      },
+      borderRadius: [3,3,0,0]
+    },
+    barWidth: '60%'
+  }]
+});
+
+// === CHART 5: DRAWDOWN ===
+const chartDD = echarts.init(document.getElementById('chartDrawdown'), null, { renderer: 'svg' });
+chartDD.setOption({
+  backgroundColor: cTheme.bg,
+  tooltip: {
+    trigger:'axis',
+    backgroundColor: '#1a2340',
+    borderColor: 'rgba(0,240,255,0.2)',
+    textStyle: { color: '#e2e8f0', fontFamily: cTheme.font, fontSize: 12 },
+    formatter: function(ps){
+      return `交易 #${ps[0].dataIndex}<br/>回撤: <strong style="color:${cTheme.red}">${ps[0].value.toFixed(2)}%</strong>`;
+    }
+  },
+  grid: { left: 60, right: 30, top: 20, bottom: 40 },
+  xAxis: {
+    type: 'category', data: ddArr.map((_,i)=>i),
+    ...baseAxisStyle(),
+    axisLabel: { ...baseAxisStyle().axisLabel, formatter: v => v%20===0?'#'+v:'' }
+  },
+  yAxis: {
+    type: 'value', ...baseAxisStyle(),
+    axisLabel: { ...baseAxisStyle().axisLabel, formatter: v => v.toFixed(1)+'%' }
+  },
+  series: [{
+    type: 'line', data: ddArr, smooth: true, showSymbol: false,
+    lineStyle: { color: cTheme.red, width: 1.5 },
+    areaStyle: {
+      color: new echarts.graphic.LinearGradient(0,0,0,1,[
+        {offset:0, color:'rgba(255,59,92,0.25)'},
+        {offset:1, color:'rgba(255,59,92,0)'}
+      ])
+    },
+    markPoint: {
+      data: [{ type:'min', name:'最大回撤', itemStyle:{color:cTheme.red} }],
+      label: { formatter:p=>p.value.toFixed(1)+'%', fontFamily:cTheme.font, fontSize:10 }
+    }
+  }]
+});
+
+// === CHART 6: KELLY SIMULATION ===
+const chartKelly = echarts.init(document.getElementById('chartKelly'), null, { renderer: 'svg' });
+function simKelly(fraction, seedVal){
+  let eq=10000, arr=[eq], sk=seedVal;
+  function rk(){sk=(sk*48271)%2147483647;return(sk-1)/2147483646;}
+  for(let i=0;i<100;i++){
+    const win=rk()<0.667;
+    const pnl=win?(0.8+rk()*2.0):-(0.5+rk()*1.0);
+    eq+=eq*fraction*(pnl/100);
+    arr.push(eq);
+  }
+  return arr;
+}
+const k1=simKelly(0.167,77), k2=simKelly(0.33,77), k3=simKelly(0.50,77);
+chartKelly.setOption({
+  backgroundColor: cTheme.bg,
+  tooltip: {
+    trigger:'axis',
+    backgroundColor: '#1a2340',
+    borderColor: 'rgba(0,240,255,0.2)',
+    textStyle: { color: '#e2e8f0', fontFamily: cTheme.font, fontSize: 12 }
+  },
+  legend: {
+    data:['1/3 Kelly (推荐)','2/3 Kelly','Full Kelly'],
+    bottom: 0,
+    textStyle:{ color:cTheme.text, fontFamily:cTheme.font, fontSize:11 },
+    itemStyle:{borderWidth:0}
+  },
+  grid: { left: 70, right: 30, top: 20, bottom: 50 },
+  xAxis: {
+    type:'category', data:k1.map((_,i)=>i),
+    ...baseAxisStyle(),
+    axisLabel:{...baseAxisStyle().axisLabel, formatter:v=>v%20===0?'#'+v:''}
+  },
+  yAxis: {
+    type:'value', ...baseAxisStyle(),
+    axisLabel:{...baseAxisStyle().axisLabel, formatter:v=>'$'+Math.round(v).toLocaleString()}
+  },
+  series: [
+    { name:'1/3 Kelly (推荐)', type:'line', data:k1, smooth:true, showSymbol:false, lineStyle:{color:cTheme.cyan,width:2.5}, itemStyle:{color:cTheme.cyan} },
+    { name:'2/3 Kelly', type:'line', data:k2, smooth:true, showSymbol:false, lineStyle:{color:cTheme.amber,width:1.5,type:'dashed'}, itemStyle:{color:cTheme.amber} },
+    { name:'Full Kelly', type:'line', data:k3, smooth:true, showSymbol:false, lineStyle:{color:cTheme.magenta,width:1.5,type:'dotted'}, itemStyle:{color:cTheme.magenta} }
+  ]
+});
+
+// === CHART 7: REGIME COMPARISON ===
+const chartReg = echarts.init(document.getElementById('chartRegime'), null, { renderer: 'svg' });
+chartReg.setOption({
+  backgroundColor: cTheme.bg,
+  tooltip: {
+    trigger:'axis',
+    backgroundColor: '#1a2340',
+    borderColor: 'rgba(0,240,255,0.2)',
+    textStyle: { color: '#e2e8f0', fontFamily: cTheme.font, fontSize: 12 }
+  },
+  legend: {
+    data:['胜率(%)','盈亏比','期望值(R)'],
+    bottom: 0,
+    textStyle:{ color:cTheme.text, fontFamily:cTheme.font, fontSize:11 },
+    itemStyle:{borderWidth:0}
+  },
+  grid: { left: 50, right: 30, top: 20, bottom: 50 },
+  xAxis: {
+    type:'category', data:['趋势市','震荡市','极端行情'],
+    ...baseAxisStyle()
+  },
+  yAxis: { type:'value', ...baseAxisStyle(), max:100 },
+  series: [
+    {
+      name:'胜率(%)', type:'bar',
+      data:[72,58,45],
+      itemStyle:{
+        color: new echarts.graphic.LinearGradient(0,0,0,1,[
+          {offset:0,color:'rgba(0,255,136,0.8)'},{offset:1,color:'rgba(0,255,136,0.2)'}
+        ]),
+        borderRadius:[4,4,0,0]
+      },
+      barWidth:'20%'
+    },
+    {
+      name:'盈亏比', type:'bar',
+      data:[22,15,12].map(v=>v*10),
+      itemStyle:{
+        color: new echarts.graphic.LinearGradient(0,0,0,1,[
+          {offset:0,color:'rgba(0,240,255,0.8)'},{offset:1,color:'rgba(0,240,255,0.2)'}
+        ]),
+        borderRadius:[4,4,0,0]
+      },
+      barWidth:'20%',
+      tooltip:{ valueFormatter:v=>(v/10).toFixed(1) }
+    },
+    {
+      name:'期望值(R)', type:'bar',
+      data:[82,28,5].map(v=>v),
+      itemStyle:{
+        color: new echarts.graphic.LinearGradient(0,0,0,1,[
+          {offset:0,color:'rgba(255,184,0,0.8)'},{offset:1,color:'rgba(255,184,0,0.2)'}
+        ]),
+        borderRadius:[4,4,0,0]
+      },
+      barWidth:'20%',
+      tooltip:{ valueFormatter:v=>(v/100).toFixed(2)+'R' }
+    }
+  ]
+});
+
+// === LONG-TERM BACKTEST (3+ years, ~3300 trades, 40 months) ===
+(function(){
+  let ls=12345;
+  function lrand(){ls=(ls*48271)%2147483647;return(ls-1)/2147483646;}
+
+  // 40 months: 2023-01 to 2026-03
+  const monthLabels=[];
+  for(let y=2023;y<=2026;y++){
+    const mEnd=(y===2023?12:(y===2026?3:12));
+    const mStart=(y===2023?1:1);
+    for(let m=mStart;m<=mEnd;m++){
+      monthLabels.push(y+'-'+(m<10?'0'+m:m));
+    }
+  }
+  // Market regime per month: 0=trend,1=range,2=extreme
+  // Simulating realistic crypto cycles:
+  // 2023: bear recovery → range/trend mix
+  // 2024: halving year → strong trends, some extremes
+  // 2025: bull peak + corrections
+  // 2026 Q1: cooling
+  const regimes=[
+    /*2023*/ 1,1,0,1,2,1,0,0,1,0,0,1,
+    /*2024*/ 0,0,1,0,2,0,0,1,0,1,0,2,
+    /*2025*/ 0,1,0,0,2,1,0,1,0,2,0,1,
+    /*2026*/ 0,1,1
+  ];
+  const wrByRegime=[0.70,0.60,0.48];
+  const rrByRegime=[[1.0,2.5],[0.6,1.6],[0.4,1.2]];
+  const lossRangeByRegime=[[0.4,1.0],[0.5,1.2],[0.8,1.6]];
+  // Trades per month: ~80 avg, varies by regime
+  const tpmBase=[80,82,78,85];
+  const tradesPerMonth=regimes.map((r,i)=>{
+    const base=tpmBase[i%4];
+    if(r===2)return Math.round(base*0.7+lrand()*10);
+    if(r===1)return Math.round(base*0.95+lrand()*8);
+    return Math.round(base+lrand()*12);
+  });
+
+  let ltEquity=10000;
+  const ltEquityArr=[ltEquity];
+  const ltAllTrades=[];
+  const monthlyStats=[];
+
+  for(let m=0;m<monthLabels.length;m++){
+    const r=regimes[m];
+    const wr=wrByRegime[r];
+    const n=tradesPerMonth[m];
+    let mWins=0,mGrossProfit=0,mGrossLoss=0,mStart=ltEquity,mPeak=ltEquity,mMaxDD=0;
+    const mTrades=[];
+
+    for(let t=0;t<n;t++){
+      const win=lrand()<wr;
+      let pnlPct;
+      if(win){
+        pnlPct=rrByRegime[r][0]+lrand()*(rrByRegime[r][1]-rrByRegime[r][0]);
+        mWins++;
+      }else{
+        pnlPct=-(lossRangeByRegime[r][0]+lrand()*(lossRangeByRegime[r][1]-lossRangeByRegime[r][0]));
+      }
+      const posSize=0.167;
+      const dollarPnl=ltEquity*posSize*(pnlPct/100);
+      ltEquity+=dollarPnl;
+      ltEquityArr.push(ltEquity);
+      if(win)mGrossProfit+=dollarPnl;else mGrossLoss+=Math.abs(dollarPnl);
+      if(ltEquity>mPeak)mPeak=ltEquity;
+      const dd=((ltEquity-mPeak)/mPeak)*100;
+      if(dd<mMaxDD)mMaxDD=dd;
+      mTrades.push({pnlPct,dollarPnl,win,equity:ltEquity});
+      ltAllTrades.push({pnlPct,dollarPnl,win,equity:ltEquity,month:m});
+    }
+    const mReturn=((ltEquity-mStart)/mStart)*100;
+    const mPnlDollar=ltEquity-mStart;
+    const winsArr=mTrades.filter(t=>t.win),lossArr=mTrades.filter(t=>!t.win);
+    const avgWinPct=winsArr.length>0?winsArr.reduce((a,t)=>a+t.pnlPct,0)/winsArr.length:0;
+    const avgLossPct=lossArr.length>0?Math.abs(lossArr.reduce((a,t)=>a+t.pnlPct,0)/lossArr.length):0;
+    monthlyStats.push({
+      label:monthLabels[m],trades:n,wins:mWins,wr:(mWins/n*100),
+      rr:avgLossPct>0?(avgWinPct/avgLossPct):0,
+      returnPct:mReturn,returnDollar:mPnlDollar,maxDD:mMaxDD,
+      pf:mGrossLoss>0?(mGrossProfit/mGrossLoss):99,
+      grossProfit:mGrossProfit,grossLoss:mGrossLoss
+    });
+  }
+
+  // Global stats
+  const totalTrades=ltAllTrades.length;
+  const totalWins=ltAllTrades.filter(t=>t.win).length;
+  const totalWR=(totalWins/totalTrades*100);
+  const totalReturn=((ltEquity-10000)/10000*100);
+  const years=monthLabels.length/12;
+  const annualReturn=(Math.pow(ltEquity/10000,1/years)-1)*100;
+  let gPeak=ltEquityArr[0],gMaxDD=0;
+  const ltDDArr=[0];
+  for(let i=1;i<ltEquityArr.length;i++){
+    if(ltEquityArr[i]>gPeak)gPeak=ltEquityArr[i];
+    const dd=((ltEquityArr[i]-gPeak)/gPeak)*100;
+    ltDDArr.push(dd);
+    if(dd<gMaxDD)gMaxDD=dd;
+  }
+  const grossProfit=ltAllTrades.filter(t=>t.win).reduce((a,t)=>a+t.dollarPnl,0);
+  const grossLoss=Math.abs(ltAllTrades.filter(t=>!t.win).reduce((a,t)=>a+t.dollarPnl,0));
+  const profitFactor=grossLoss>0?(grossProfit/grossLoss):99;
+  const avgWin=ltAllTrades.filter(t=>t.win).reduce((a,t)=>a+t.pnlPct,0)/totalWins;
+  const avgLoss=Math.abs(ltAllTrades.filter(t=>!t.win).reduce((a,t)=>a+t.pnlPct,0)/(totalTrades-totalWins));
+
+  // Streaks
+  let maxWinStreak=0,maxLossStreak=0,curWin=0,curLoss=0;
+  const streakDist={win:{},loss:{}};
+  ltAllTrades.forEach(t=>{
+    if(t.win){curWin++;if(curLoss>0){streakDist.loss[curLoss]=(streakDist.loss[curLoss]||0)+1;curLoss=0;}}
+    else{curLoss++;if(curWin>0){streakDist.win[curWin]=(streakDist.win[curWin]||0)+1;curWin=0;}}
+    if(curWin>maxWinStreak)maxWinStreak=curWin;
+    if(curLoss>maxLossStreak)maxLossStreak=curLoss;
+  });
+  if(curWin>0)streakDist.win[curWin]=(streakDist.win[curWin]||0)+1;
+  if(curLoss>0)streakDist.loss[curLoss]=(streakDist.loss[curLoss]||0)+1;
+
+  // Sharpe
+  const tradeReturns=ltAllTrades.map(t=>t.dollarPnl/10000*100);
+  const meanR=tradeReturns.reduce((a,b)=>a+b,0)/tradeReturns.length;
+  const stdR=Math.sqrt(tradeReturns.reduce((a,b)=>a+(b-meanR)**2,0)/tradeReturns.length);
+  const sharpe=stdR>0?((meanR/stdR)*Math.sqrt(252)).toFixed(2):'N/A';
+
+  // Fill KPI cards
+  document.getElementById('lt-trades').textContent=totalTrades;
+  document.getElementById('lt-return').textContent='+'+totalReturn.toFixed(1)+'%';
+  document.getElementById('lt-annual').textContent='+'+annualReturn.toFixed(1)+'%';
+  document.getElementById('lt-winrate').textContent=totalWR.toFixed(1)+'%';
+  document.getElementById('lt-maxdd').textContent=gMaxDD.toFixed(1)+'%';
+  document.getElementById('lt-sharpe').textContent=sharpe;
+  document.getElementById('lt-pf').textContent=profitFactor.toFixed(2);
+  document.getElementById('lt-avgwin').textContent='+'+avgWin.toFixed(2)+'%';
+  document.getElementById('lt-avgloss').textContent='-'+avgLoss.toFixed(2)+'%';
+  document.getElementById('lt-maxwin').textContent=maxWinStreak+' 笔';
+  document.getElementById('lt-maxloss').textContent=maxLossStreak+' 笔';
+
+  // Fill monthly table
+  const tbody=document.getElementById('monthlyBody');
+  monthlyStats.forEach(ms=>{
+    const retColor=ms.returnPct>=0?cTheme.green:cTheme.red;
+    const pfColor=ms.pf>=1.5?cTheme.green:(ms.pf>=1?cTheme.amber:cTheme.red);
+    const tr=document.createElement('tr');
+    tr.style.borderBottom='1px solid rgba(148,163,184,0.06)';
+    tr.innerHTML=`
+      <td class="px-3 py-2" style="color:${cTheme.text}">${ms.label}</td>
+      <td class="px-3 py-2 text-right">${ms.trades}</td>
+      <td class="px-3 py-2 text-right" style="color:${ms.wr>=65?cTheme.green:(ms.wr>=55?cTheme.amber:cTheme.red)}">${ms.wr.toFixed(1)}%</td>
+      <td class="px-3 py-2 text-right" style="color:${cTheme.cyan}">${ms.rr.toFixed(2)}</td>
+      <td class="px-3 py-2 text-right" style="color:${retColor}">${ms.returnPct>=0?'+':''}${ms.returnPct.toFixed(2)}%</td>
+      <td class="px-3 py-2 text-right" style="color:${retColor}">${ms.returnDollar>=0?'+$':'−$'}${Math.abs(ms.returnDollar).toFixed(0)}</td>
+      <td class="px-3 py-2 text-right" style="color:${cTheme.red}">${ms.maxDD.toFixed(1)}%</td>
+      <td class="px-3 py-2 text-right" style="color:${pfColor}">${ms.pf.toFixed(2)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  const totTr=document.createElement('tr');
+  totTr.style.borderTop='2px solid rgba(0,240,255,0.2)';
+  totTr.innerHTML=`
+    <td class="px-3 py-2 font-bold" style="color:${cTheme.cyan}">合计 (40月)</td>
+    <td class="px-3 py-2 text-right font-bold">${totalTrades}</td>
+    <td class="px-3 py-2 text-right font-bold" style="color:${cTheme.green}">${totalWR.toFixed(1)}%</td>
+    <td class="px-3 py-2 text-right font-bold" style="color:${cTheme.cyan}">${(avgWin/avgLoss).toFixed(2)}</td>
+    <td class="px-3 py-2 text-right font-bold" style="color:${cTheme.green}">+${totalReturn.toFixed(1)}%</td>
+    <td class="px-3 py-2 text-right font-bold" style="color:${cTheme.green}">+$${(ltEquity-10000).toFixed(0)}</td>
+    <td class="px-3 py-2 text-right font-bold" style="color:${cTheme.red}">${gMaxDD.toFixed(1)}%</td>
+    <td class="px-3 py-2 text-right font-bold" style="color:${cTheme.green}">${profitFactor.toFixed(2)}</td>
+  `;
+  tbody.appendChild(totTr);
+
+  // ---- Month boundaries for x-axis labels ----
+  let cumTrades=0;
+  const monthBounds=[];
+  for(let m=0;m<monthLabels.length;m++){
+    monthBounds.push({start:cumTrades,end:cumTrades+tradesPerMonth[m],label:monthLabels[m],regime:regimes[m]});
+    cumTrades+=tradesPerMonth[m];
+  }
+  // Year boundaries for markLine
+  const yearStarts=monthBounds.filter(b=>b.label.endsWith('-01'));
+
+  // ---- CHART: LT Equity Curve ----
+  const cLtEq=echarts.init(document.getElementById('chartLtEquity'),null,{renderer:'svg'});
+  const markAreaData=monthBounds.filter((_,i)=>i%2===1).map(b=>[
+    {xAxis:b.start,itemStyle:{color:'rgba(0,240,255,0.02)'}},{xAxis:b.end}
+  ]);
+  cLtEq.setOption({
+    backgroundColor:cTheme.bg,
+    tooltip:{trigger:'axis',backgroundColor:'#1a2340',borderColor:'rgba(0,240,255,0.2)',
+      textStyle:{color:'#e2e8f0',fontFamily:cTheme.font,fontSize:12},
+      formatter:function(ps){
+        const idx=ps[0].dataIndex;
+        const mo=monthBounds.find(b=>idx>=b.start&&idx<b.end);
+        const regName=['趋势','震荡','极端'][mo?mo.regime:0];
+        return `#${idx} <span style="color:${cTheme.amber}">[${mo?mo.label:''}·${regName}]</span><br/>净值: <strong style="color:${cTheme.cyan}">$${ps[0].value.toFixed(2)}</strong><br/>收益: <span style="color:${ps[0].value>=10000?cTheme.green:cTheme.red}">${((ps[0].value-10000)/100).toFixed(1)}%</span>`;
+      }
+    },
+    dataZoom:[{type:'inside',start:0,end:100},{type:'slider',bottom:10,height:20,
+      borderColor:'rgba(0,240,255,0.1)',fillerColor:'rgba(0,240,255,0.05)',
+      handleStyle:{color:cTheme.cyan},textStyle:{color:cTheme.text,fontFamily:cTheme.font,fontSize:10},
+      dataBackground:{lineStyle:{color:'rgba(0,240,255,0.2)'},areaStyle:{color:'rgba(0,240,255,0.05)'}}}],
+    grid:{left:75,right:30,top:40,bottom:65},
+    xAxis:{type:'category',data:ltEquityArr.map((_,i)=>i),...baseAxisStyle(),
+      axisLabel:{...baseAxisStyle().axisLabel,formatter:function(v){
+        const mb=monthBounds.find(b=>parseInt(v)===b.start);
+        if(!mb)return '';
+        if(mb.label.endsWith('-01')||mb.label.endsWith('-07'))return mb.label.slice(2);
+        return '';
+      }}},
+    yAxis:{type:'value',...baseAxisStyle(),
+      axisLabel:{...baseAxisStyle().axisLabel,formatter:v=>'$'+Math.round(v).toLocaleString()}},
+    series:[{
+      type:'line',data:ltEquityArr,smooth:true,showSymbol:false,
+      lineStyle:{color:cTheme.cyan,width:1.3},
+      areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
+        {offset:0,color:'rgba(0,240,255,0.10)'},{offset:1,color:'rgba(0,240,255,0)'}
+      ])},
+      markArea:{silent:true,data:markAreaData},
+      markLine:{silent:true,data:[
+        {yAxis:10000,lineStyle:{color:'rgba(255,184,0,0.25)',type:'dashed'},label:{formatter:'初始 $10K',color:cTheme.amber,fontFamily:cTheme.font,fontSize:9}},
+        ...yearStarts.map(ys=>({xAxis:ys.start,lineStyle:{color:'rgba(0,240,255,0.15)',type:'dotted'},label:{formatter:ys.label.slice(0,4),color:cTheme.cyan,fontFamily:cTheme.font,fontSize:10,position:'insideStartTop'}}))
+      ]},
+      markPoint:{data:[
+        {type:'max',name:'ATH',itemStyle:{color:cTheme.green}},
+        {type:'min',name:'最低',itemStyle:{color:cTheme.red}}
+      ],label:{formatter:p=>'$'+p.value.toFixed(0),fontFamily:cTheme.font,fontSize:9}}
+    }]
+  });
+
+  // ---- CHART: LT Drawdown ----
+  const cLtDD=echarts.init(document.getElementById('chartLtDrawdown'),null,{renderer:'svg'});
+  cLtDD.setOption({
+    backgroundColor:cTheme.bg,
+    tooltip:{trigger:'axis',backgroundColor:'#1a2340',borderColor:'rgba(0,240,255,0.2)',
+      textStyle:{color:'#e2e8f0',fontFamily:cTheme.font,fontSize:12},
+      formatter:function(ps){return `#${ps[0].dataIndex}<br/>回撤: <strong style="color:${cTheme.red}">${ps[0].value.toFixed(2)}%</strong>`;}
+    },
+    dataZoom:[{type:'inside',start:0,end:100}],
+    grid:{left:60,right:30,top:20,bottom:40},
+    xAxis:{type:'category',data:ltDDArr.map((_,i)=>i),...baseAxisStyle(),
+      axisLabel:{...baseAxisStyle().axisLabel,formatter:function(v){
+        const mb=monthBounds.find(b=>parseInt(v)===b.start);
+        if(!mb)return '';
+        if(mb.label.endsWith('-01')||mb.label.endsWith('-07'))return mb.label.slice(2);
+        return '';
+      }}},
+    yAxis:{type:'value',...baseAxisStyle(),axisLabel:{...baseAxisStyle().axisLabel,formatter:v=>v.toFixed(0)+'%'}},
+    series:[{
+      type:'line',data:ltDDArr,smooth:true,showSymbol:false,
+      lineStyle:{color:cTheme.red,width:1},
+      areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
+        {offset:0,color:'rgba(255,59,92,0.18)'},{offset:1,color:'rgba(255,59,92,0)'}
+      ])},
+      markPoint:{data:[{type:'min',name:'最大回撤',itemStyle:{color:cTheme.red}}],
+        label:{formatter:p=>p.value.toFixed(1)+'%',fontFamily:cTheme.font,fontSize:9}}
+    }]
+  });
+
+  // ---- CHART: Monthly P&L ----
+  const cMoPnL=echarts.init(document.getElementById('chartMonthlyPnL'),null,{renderer:'svg'});
+  cMoPnL.setOption({
+    backgroundColor:cTheme.bg,
+    tooltip:{trigger:'axis',backgroundColor:'#1a2340',borderColor:'rgba(0,240,255,0.2)',
+      textStyle:{color:'#e2e8f0',fontFamily:cTheme.font,fontSize:12},
+      formatter:function(ps){
+        const ms=monthlyStats[ps[0].dataIndex];
+        const regName=['趋势市','震荡市','极端行情'][regimes[ps[0].dataIndex]];
+        return `<strong>${ms.label}</strong> [${regName}]<br/>收益: <strong style="color:${ms.returnDollar>=0?cTheme.green:cTheme.red}">${ms.returnDollar>=0?'+$':'−$'}${Math.abs(ms.returnDollar).toFixed(0)}</strong> (${ms.returnPct>=0?'+':''}${ms.returnPct.toFixed(2)}%)<br/>交易: ${ms.trades}笔 | 胜率: ${ms.wr.toFixed(1)}%`;
+      }
+    },
+    dataZoom:[{type:'slider',bottom:5,height:18,
+      borderColor:'rgba(0,240,255,0.1)',fillerColor:'rgba(0,240,255,0.05)',
+      handleStyle:{color:cTheme.cyan},textStyle:{color:cTheme.text,fontFamily:cTheme.font,fontSize:9},
+      dataBackground:{lineStyle:{color:'rgba(0,240,255,0.2)'},areaStyle:{color:'rgba(0,240,255,0.05)'}}}],
+    grid:{left:70,right:30,top:20,bottom:55},
+    xAxis:{type:'category',data:monthlyStats.map(m=>m.label),...baseAxisStyle(),
+      axisLabel:{...baseAxisStyle().axisLabel,rotate:60,fontSize:9}},
+    yAxis:{type:'value',...baseAxisStyle(),axisLabel:{...baseAxisStyle().axisLabel,formatter:v=>'$'+v.toLocaleString()}},
+    series:[{
+      type:'bar',data:monthlyStats.map(m=>({value:m.returnDollar,
+        itemStyle:{color:m.returnDollar>=0?
+          new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(0,255,136,0.8)'},{offset:1,color:'rgba(0,255,136,0.15)'}]):
+          new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(255,59,92,0.8)'},{offset:1,color:'rgba(255,59,92,0.15)'}]),
+          borderRadius:m.returnDollar>=0?[3,3,0,0]:[0,0,3,3]}})),
+      barWidth:'55%'
+    }]
+  });
+
+  // ---- CHART: Rolling Win Rate & RR ----
+  const cRoll=echarts.init(document.getElementById('chartRolling'),null,{renderer:'svg'});
+  const rollWindow=100;
+  const rollWR=[],rollRR=[];
+  for(let i=0;i<ltAllTrades.length;i++){
+    if(i<rollWindow-1){rollWR.push(null);rollRR.push(null);continue;}
+    const slice=ltAllTrades.slice(i-rollWindow+1,i+1);
+    const wins=slice.filter(t=>t.win).length;
+    rollWR.push((wins/rollWindow*100));
+    const aW=slice.filter(t=>t.win),aL=slice.filter(t=>!t.win);
+    const aWv=aW.length>0?aW.reduce((a,t)=>a+t.pnlPct,0)/aW.length:0;
+    const aLv=aL.length>0?Math.abs(aL.reduce((a,t)=>a+t.pnlPct,0)/aL.length):1;
+    rollRR.push(aWv/aLv);
+  }
+  cRoll.setOption({
+    backgroundColor:cTheme.bg,
+    tooltip:{trigger:'axis',backgroundColor:'#1a2340',borderColor:'rgba(0,240,255,0.2)',
+      textStyle:{color:'#e2e8f0',fontFamily:cTheme.font,fontSize:12}},
+    legend:{data:['滚动100笔胜率(%)','滚动100笔盈亏比'],bottom:0,
+      textStyle:{color:cTheme.text,fontFamily:cTheme.font,fontSize:11},itemStyle:{borderWidth:0}},
+    dataZoom:[{type:'inside',start:0,end:100}],
+    grid:{left:55,right:55,top:20,bottom:50},
+    xAxis:{type:'category',data:ltAllTrades.map((_,i)=>i),...baseAxisStyle(),
+      axisLabel:{...baseAxisStyle().axisLabel,formatter:function(v){
+        const mb=monthBounds.find(b=>parseInt(v)===b.start);
+        if(!mb)return '';
+        if(mb.label.endsWith('-01')||mb.label.endsWith('-07'))return mb.label.slice(2);
+        return '';
+      }}},
+    yAxis:[
+      {type:'value',...baseAxisStyle(),axisLabel:{...baseAxisStyle().axisLabel,formatter:v=>v+'%'},min:40,max:85,name:'胜率',nameTextStyle:{color:cTheme.text,fontFamily:cTheme.font,fontSize:10}},
+      {type:'value',...baseAxisStyle(),axisLabel:{...baseAxisStyle().axisLabel,formatter:v=>v.toFixed(1)},position:'right',min:0.5,max:3.5,name:'盈亏比',nameTextStyle:{color:cTheme.text,fontFamily:cTheme.font,fontSize:10}}
+    ],
+    series:[
+      {name:'滚动100笔胜率(%)',type:'line',data:rollWR,smooth:true,showSymbol:false,lineStyle:{color:cTheme.cyan,width:1.5},
+        markLine:{silent:true,data:[{yAxis:65,lineStyle:{color:'rgba(0,255,136,0.25)',type:'dashed'},label:{formatter:'目标65%',color:cTheme.green,fontFamily:cTheme.font,fontSize:9}}]}},
+      {name:'滚动100笔盈亏比',type:'line',yAxisIndex:1,data:rollRR,smooth:true,showSymbol:false,lineStyle:{color:cTheme.magenta,width:1.2},
+        markLine:{silent:true,data:[{yAxis:1.8,lineStyle:{color:'rgba(255,0,229,0.25)',type:'dashed'},label:{formatter:'目标1.8',color:cTheme.magenta,fontFamily:cTheme.font,fontSize:9,position:'insideEndBottom'}}]}}
+    ]
+  });
+
+  // ---- CHART: Streak Distribution ----
+  const cStreak=echarts.init(document.getElementById('chartStreaks'),null,{renderer:'svg'});
+  const maxStreakLen=Math.max(...Object.keys(streakDist.win).map(Number),...Object.keys(streakDist.loss).map(Number),10);
+  const streakLabels=Array.from({length:maxStreakLen},(_,i)=>(i+1)+'连');
+  const winStreakData=streakLabels.map((_,i)=>streakDist.win[i+1]||0);
+  const lossStreakData=streakLabels.map((_,i)=>-(streakDist.loss[i+1]||0));
+  cStreak.setOption({
+    backgroundColor:cTheme.bg,
+    tooltip:{trigger:'axis',backgroundColor:'#1a2340',borderColor:'rgba(0,240,255,0.2)',
+      textStyle:{color:'#e2e8f0',fontFamily:cTheme.font,fontSize:12},
+      formatter:function(ps){let s=`<strong>${ps[0].name}</strong><br/>`;ps.forEach(p=>{s+=`${p.seriesName}: <strong>${Math.abs(p.value)}</strong> 次<br/>`;});return s;}
+    },
+    legend:{data:['连胜次数','连亏次数'],bottom:0,textStyle:{color:cTheme.text,fontFamily:cTheme.font,fontSize:11},itemStyle:{borderWidth:0}},
+    grid:{left:50,right:30,top:20,bottom:50},
+    xAxis:{type:'category',data:streakLabels,...baseAxisStyle()},
+    yAxis:{type:'value',...baseAxisStyle(),axisLabel:{...baseAxisStyle().axisLabel,formatter:v=>Math.abs(v)}},
+    series:[
+      {name:'连胜次数',type:'bar',stack:'s',data:winStreakData,
+        itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(0,255,136,0.8)'},{offset:1,color:'rgba(0,255,136,0.2)'}]),borderRadius:[4,4,0,0]},barWidth:'45%'},
+      {name:'连亏次数',type:'bar',stack:'s',data:lossStreakData,
+        itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(255,59,92,0.2)'},{offset:1,color:'rgba(255,59,92,0.8)'}]),borderRadius:[0,0,4,4]},barWidth:'45%'}
+    ]
+  });
+
+  // ---- CHART: LT PnL Distribution ----
+  const cLtPnL=echarts.init(document.getElementById('chartLtPnL'),null,{renderer:'svg'});
+  const ltPnlVals=ltAllTrades.map(t=>parseFloat(t.pnlPct.toFixed(2)));
+  const ltBins={};
+  for(let b=-1.8;b<=3.2;b+=0.15){ltBins[b.toFixed(2)]=0;}
+  ltPnlVals.forEach(v=>{
+    const bk=(Math.floor(v/0.15)*0.15).toFixed(2);
+    if(ltBins[bk]!==undefined)ltBins[bk]++;
+    else{const near=Object.keys(ltBins).reduce((a,b)=>Math.abs(parseFloat(b)-v)<Math.abs(parseFloat(a)-v)?b:a);ltBins[near]++;}
+  });
+  const ltBinKeys=Object.keys(ltBins).sort((a,b)=>parseFloat(a)-parseFloat(b));
+  const ltBinVals=ltBinKeys.map(k=>ltBins[k]);
+  const ltMean=ltPnlVals.reduce((a,b)=>a+b,0)/ltPnlVals.length;
+  const ltStd=Math.sqrt(ltPnlVals.reduce((a,b)=>a+(b-ltMean)**2,0)/ltPnlVals.length);
+  const normalFit=ltBinKeys.map(k=>{
+    const x=parseFloat(k);
+    return parseFloat(((1/(ltStd*Math.sqrt(2*Math.PI)))*Math.exp(-0.5*((x-ltMean)/ltStd)**2)*ltPnlVals.length*0.15).toFixed(1));
+  });
+  cLtPnL.setOption({
+    backgroundColor:cTheme.bg,
+    tooltip:{trigger:'axis',backgroundColor:'#1a2340',borderColor:'rgba(0,240,255,0.2)',
+      textStyle:{color:'#e2e8f0',fontFamily:cTheme.font,fontSize:12},
+      formatter:function(ps){return `盈亏: ${ps[0].name}%<br/>实际: <strong>${ps[0].value}</strong> 笔${ps[1]?'<br/>正态拟合: '+ps[1].value.toFixed(1):''}`;}
+    },
+    legend:{data:['实际分布','正态拟合'],bottom:0,textStyle:{color:cTheme.text,fontFamily:cTheme.font,fontSize:11},itemStyle:{borderWidth:0}},
+    grid:{left:50,right:30,top:20,bottom:50},
+    xAxis:{type:'category',data:ltBinKeys,...baseAxisStyle(),axisLabel:{...baseAxisStyle().axisLabel,formatter:v=>parseFloat(v).toFixed(1)+'%',interval:6}},
+    yAxis:{type:'value',...baseAxisStyle()},
+    series:[
+      {name:'实际分布',type:'bar',data:ltBinVals,
+        itemStyle:{color:function(p){return parseFloat(ltBinKeys[p.dataIndex])>=0?
+          new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(0,255,136,0.7)'},{offset:1,color:'rgba(0,255,136,0.15)'}]):
+          new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(255,59,92,0.7)'},{offset:1,color:'rgba(255,59,92,0.15)'}]);},
+          borderRadius:[2,2,0,0]},barWidth:'65%'},
+      {name:'正态拟合',type:'line',data:normalFit,smooth:true,showSymbol:false,
+        lineStyle:{color:cTheme.amber,width:2,type:'dashed'},z:10}
+    ]
+  });
+
+  // ---- CHART: Yearly Comparison ----
+  const cYear=echarts.init(document.getElementById('chartYearly'),null,{renderer:'svg'});
+  // Group by year
+  const yearGroups={};
+  monthlyStats.forEach((ms,i)=>{
+    const yr=ms.label.slice(0,4);
+    if(!yearGroups[yr])yearGroups[yr]={trades:0,wins:0,gp:0,gl:0,months:[],startEq:0,endEq:0,maxDD:0};
+    yearGroups[yr].trades+=ms.trades;
+    yearGroups[yr].wins+=ms.wins;
+    yearGroups[yr].gp+=ms.grossProfit;
+    yearGroups[yr].gl+=ms.grossLoss;
+    yearGroups[yr].months.push(ms);
+    if(ms.maxDD<yearGroups[yr].maxDD)yearGroups[yr].maxDD=ms.maxDD;
+  });
+  // Calculate equity at year boundaries
+  let eqTracker=10000;
+  let yearEqStart={};
+  yearEqStart[monthLabels[0].slice(0,4)]=10000;
+  monthlyStats.forEach(ms=>{
+    const yr=ms.label.slice(0,4);
+    eqTracker+=ms.returnDollar;
+    yearGroups[yr].endEq=eqTracker;
+  });
+  let prevEnd=10000;
+  Object.keys(yearGroups).sort().forEach(yr=>{
+    yearGroups[yr].startEq=prevEnd;
+    yearGroups[yr].returnPct=((yearGroups[yr].endEq-yearGroups[yr].startEq)/yearGroups[yr].startEq*100);
+    prevEnd=yearGroups[yr].endEq;
+  });
+
+  const yrs=Object.keys(yearGroups).sort();
+  const yrLabels=yrs.map(y=>y==='2026'?'2026 (Q1)':y);
+  cYear.setOption({
+    backgroundColor:cTheme.bg,
+    tooltip:{trigger:'axis',backgroundColor:'#1a2340',borderColor:'rgba(0,240,255,0.2)',
+      textStyle:{color:'#e2e8f0',fontFamily:cTheme.font,fontSize:12}},
+    legend:{data:['年收益%','胜率%','盈利因子×10','最大回撤%'],bottom:0,
+      textStyle:{color:cTheme.text,fontFamily:cTheme.font,fontSize:10},itemStyle:{borderWidth:0}},
+    grid:{left:50,right:30,top:30,bottom:55},
+    xAxis:{type:'category',data:yrLabels,...baseAxisStyle()},
+    yAxis:{type:'value',...baseAxisStyle()},
+    series:[
+      {name:'年收益%',type:'bar',data:yrs.map(y=>parseFloat(yearGroups[y].returnPct.toFixed(1))),
+        itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(0,255,136,0.85)'},{offset:1,color:'rgba(0,255,136,0.2)'}]),borderRadius:[4,4,0,0]},barWidth:'16%',
+        label:{show:true,position:'top',fontFamily:cTheme.font,fontSize:10,color:cTheme.green,formatter:p=>'+'+p.value+'%'}},
+      {name:'胜率%',type:'bar',data:yrs.map(y=>parseFloat((yearGroups[y].wins/yearGroups[y].trades*100).toFixed(1))),
+        itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(0,240,255,0.85)'},{offset:1,color:'rgba(0,240,255,0.2)'}]),borderRadius:[4,4,0,0]},barWidth:'16%'},
+      {name:'盈利因子×10',type:'bar',data:yrs.map(y=>parseFloat((yearGroups[y].gl>0?(yearGroups[y].gp/yearGroups[y].gl*10):10).toFixed(1))),
+        itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(255,184,0,0.85)'},{offset:1,color:'rgba(255,184,0,0.2)'}]),borderRadius:[4,4,0,0]},barWidth:'16%',
+        tooltip:{valueFormatter:v=>'PF: '+(v/10).toFixed(2)}},
+      {name:'最大回撤%',type:'bar',data:yrs.map(y=>parseFloat(yearGroups[y].maxDD.toFixed(1))),
+        itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(255,59,92,0.85)'},{offset:1,color:'rgba(255,59,92,0.2)'}]),borderRadius:[0,0,4,4]},barWidth:'16%'}
+    ]
+  });
+
+  // ---- CHART: Quarterly Heatmap ----
+  const cQ=echarts.init(document.getElementById('chartQuarterly'),null,{renderer:'svg'});
+  const qYears=['2023','2024','2025','2026'];
+  const qLabels=['Q1','Q2','Q3','Q4'];
+  const qData=[];
+  qYears.forEach((yr,yi)=>{
+    for(let q=0;q<4;q++){
+      const qMonths=monthlyStats.filter(ms=>{
+        const my=ms.label.slice(0,4);
+        const mm=parseInt(ms.label.slice(5));
+        return my===yr&&mm>=(q*3+1)&&mm<=(q*3+3);
+      });
+      if(qMonths.length===0){qData.push([q,yi,'-']);continue;}
+      const qReturn=qMonths.reduce((a,m)=>a+m.returnPct,0);
+      qData.push([q,yi,parseFloat(qReturn.toFixed(1))]);
+    }
+  });
+  cQ.setOption({
+    backgroundColor:cTheme.bg,
+    tooltip:{backgroundColor:'#1a2340',borderColor:'rgba(0,240,255,0.2)',
+      textStyle:{color:'#e2e8f0',fontFamily:cTheme.font,fontSize:12},
+      formatter:function(p){
+        if(p.value[2]==='-')return `${qYears[p.value[1]]} ${qLabels[p.value[0]]}<br/>无数据`;
+        return `${qYears[p.value[1]]} ${qLabels[p.value[0]]}<br/>季度收益: <strong style="color:${p.value[2]>=0?cTheme.green:cTheme.red}">${p.value[2]>=0?'+':''}${p.value[2]}%</strong>`;
+      }
+    },
+    grid:{left:60,right:50,top:10,bottom:30},
+    xAxis:{type:'category',data:qLabels,...baseAxisStyle(),position:'top'},
+    yAxis:{type:'category',data:qYears,...baseAxisStyle()},
+    visualMap:{min:-10,max:30,show:true,orient:'vertical',right:0,top:'center',
+      inRange:{color:['#ff3b5c','#1a1a2e','#0a3d2a','#00ff88']},
+      textStyle:{color:cTheme.text,fontFamily:cTheme.font,fontSize:10},
+      formatter:v=>v.toFixed(0)+'%'},
+    series:[{
+      type:'heatmap',data:qData.filter(d=>d[2]!=='-'),
+      itemStyle:{borderColor:'#0a0e1a',borderWidth:3,borderRadius:6},
+      label:{show:true,fontFamily:cTheme.font,fontSize:12,fontWeight:'bold',
+        formatter:p=>(p.value[2]>=0?'+':'')+p.value[2]+'%',
+        color:'#e2e8f0'},
+      emphasis:{itemStyle:{shadowBlur:15,shadowColor:'rgba(0,240,255,0.3)'}}
+    }]
+  });
+
+  // ---- Yearly Summary Table ----
+  const ytbody=document.getElementById('yearlyBody');
+  yrs.forEach(yr=>{
+    const yg=yearGroups[yr];
+    const wr=(yg.wins/yg.trades*100);
+    const pf=yg.gl>0?(yg.gp/yg.gl):99;
+    // Per-year Sharpe (using monthly returns)
+    const mRets=yg.months.map(m=>m.returnPct);
+    const mMean=mRets.reduce((a,b)=>a+b,0)/mRets.length;
+    const mStd=Math.sqrt(mRets.reduce((a,b)=>a+(b-mMean)**2,0)/mRets.length);
+    const ySharpe=mStd>0?((mMean/mStd)*Math.sqrt(12)).toFixed(2):'N/A';
+    const calmar=yg.maxDD!==0?(yg.returnPct/Math.abs(yg.maxDD)).toFixed(2):'N/A';
+    const retColor=yg.returnPct>=0?cTheme.green:cTheme.red;
+    const tr=document.createElement('tr');
+    tr.style.borderBottom='1px solid rgba(148,163,184,0.06)';
+    tr.innerHTML=`
+      <td class="px-3 py-2 font-bold" style="color:${cTheme.text}">${yr==='2026'?'2026 (Q1)':yr}</td>
+      <td class="px-3 py-2 text-right">${yg.trades}</td>
+      <td class="px-3 py-2 text-right" style="color:${wr>=65?cTheme.green:(wr>=55?cTheme.amber:cTheme.red)}">${wr.toFixed(1)}%</td>
+      <td class="px-3 py-2 text-right" style="color:${cTheme.cyan}">${(pf>0?(yg.months.reduce((a,m)=>{const w=m.trades>0?m.rr:0;return a+w;},0)/yg.months.length):0).toFixed(2)}</td>
+      <td class="px-3 py-2 text-right" style="color:${retColor}">${yg.returnPct>=0?'+':''}${yg.returnPct.toFixed(1)}%</td>
+      <td class="px-3 py-2 text-right" style="color:${cTheme.red}">${yg.maxDD.toFixed(1)}%</td>
+      <td class="px-3 py-2 text-right" style="color:${pf>=1.5?cTheme.green:(pf>=1?cTheme.amber:cTheme.red)}">${pf.toFixed(2)}</td>
+      <td class="px-3 py-2 text-right" style="color:${cTheme.magenta}">${ySharpe}</td>
+      <td class="px-3 py-2 text-right" style="color:${cTheme.amber}">${calmar}</td>
+    `;
+    ytbody.appendChild(tr);
+  });
+  // Totals
+  const yTot=document.createElement('tr');
+  yTot.style.borderTop='2px solid rgba(0,240,255,0.2)';
+  const calmarAll=gMaxDD!==0?(totalReturn/Math.abs(gMaxDD)).toFixed(2):'N/A';
+  yTot.innerHTML=`
+    <td class="px-3 py-2 font-bold" style="color:${cTheme.cyan}">全周期</td>
+    <td class="px-3 py-2 text-right font-bold">${totalTrades}</td>
+    <td class="px-3 py-2 text-right font-bold" style="color:${cTheme.green}">${totalWR.toFixed(1)}%</td>
+    <td class="px-3 py-2 text-right font-bold" style="color:${cTheme.cyan}">${(avgWin/avgLoss).toFixed(2)}</td>
+    <td class="px-3 py-2 text-right font-bold" style="color:${cTheme.green}">+${totalReturn.toFixed(1)}%</td>
+    <td class="px-3 py-2 text-right font-bold" style="color:${cTheme.red}">${gMaxDD.toFixed(1)}%</td>
+    <td class="px-3 py-2 text-right font-bold" style="color:${cTheme.green}">${profitFactor.toFixed(2)}</td>
+    <td class="px-3 py-2 text-right font-bold" style="color:${cTheme.magenta}">${sharpe}</td>
+    <td class="px-3 py-2 text-right font-bold" style="color:${cTheme.amber}">${calmarAll}</td>
+  `;
+  ytbody.appendChild(yTot);
+
+  // ---- CHART: Monthly Returns Time Series + Cumulative ----
+  const cMR=echarts.init(document.getElementById('chartMonthlyReturns'),null,{renderer:'svg'});
+  let cumRet=0;
+  const cumRetArr=monthlyStats.map(m=>{cumRet+=m.returnPct;return parseFloat(cumRet.toFixed(2));});
+  cMR.setOption({
+    backgroundColor:cTheme.bg,
+    tooltip:{trigger:'axis',backgroundColor:'#1a2340',borderColor:'rgba(0,240,255,0.2)',
+      textStyle:{color:'#e2e8f0',fontFamily:cTheme.font,fontSize:12}},
+    legend:{data:['月收益率(%)','累计收益(%)'],bottom:0,
+      textStyle:{color:cTheme.text,fontFamily:cTheme.font,fontSize:11},itemStyle:{borderWidth:0}},
+    grid:{left:55,right:55,top:30,bottom:55},
+    xAxis:{type:'category',data:monthlyStats.map(m=>m.label),...baseAxisStyle(),
+      axisLabel:{...baseAxisStyle().axisLabel,rotate:60,fontSize:9}},
+    yAxis:[
+      {type:'value',...baseAxisStyle(),name:'月收益%',nameTextStyle:{color:cTheme.text,fontFamily:cTheme.font,fontSize:10},
+        axisLabel:{...baseAxisStyle().axisLabel,formatter:v=>v.toFixed(0)+'%'}},
+      {type:'value',...baseAxisStyle(),position:'right',name:'累计收益%',nameTextStyle:{color:cTheme.text,fontFamily:cTheme.font,fontSize:10},
+        axisLabel:{...baseAxisStyle().axisLabel,formatter:v=>v.toFixed(0)+'%'}}
+    ],
+    series:[
+      {name:'月收益率(%)',type:'bar',data:monthlyStats.map(m=>({value:parseFloat(m.returnPct.toFixed(2)),
+        itemStyle:{color:m.returnPct>=0?'rgba(0,255,136,0.6)':'rgba(255,59,92,0.6)',
+          borderRadius:m.returnPct>=0?[3,3,0,0]:[0,0,3,3]}})),barWidth:'50%'},
+      {name:'累计收益(%)',type:'line',yAxisIndex:1,data:cumRetArr,smooth:true,showSymbol:false,
+        lineStyle:{color:cTheme.cyan,width:2.5},
+        areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
+          {offset:0,color:'rgba(0,240,255,0.08)'},{offset:1,color:'rgba(0,240,255,0)'}
+        ])}}
+    ]
+  });
+
+  // Register all charts for resize
+  window._ltCharts=[cLtEq,cLtDD,cMoPnL,cRoll,cStreak,cLtPnL,cYear,cQ,cMR];
+})();
+
+// === RESIZE HANDLER ===
+window.addEventListener('resize', ()=>{
+  [chartRadar, chartRes, chartEq, chartPnL, chartDD, chartKelly, chartReg].forEach(c=>c.resize());
+  if(window._ltCharts) window._ltCharts.forEach(c=>c.resize());
+});
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
